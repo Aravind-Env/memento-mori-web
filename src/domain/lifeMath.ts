@@ -124,8 +124,3 @@ export function cellState(weekIndex: number, stats: LifeStats): CellState {
 export function weekAge(weekIndex: number): number {
   return Math.floor(weekIndex / WEEKS_PER_YEAR)
 }
-
-/** True when the week begins a new year-of-age row (used for row labels). */
-export function isYearStart(weekIndex: number): boolean {
-  return weekIndex % WEEKS_PER_YEAR === 0
-}

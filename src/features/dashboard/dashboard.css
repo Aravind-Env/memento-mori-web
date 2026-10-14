@@ -1,0 +1,340 @@
+/* ============================================================
+   Dashboard — "Your life in weeks" card
+   Ported from the reference design, mapped onto the app's tokens.
+   ============================================================ */
+
+.mm-page {
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 2.5vh, 2rem) clamp(1rem, 2vw, 1.5rem);
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.mm-card {
+  width: min(1400px, 100%);
+  height: 100%;
+  min-height: 0;
+  background: var(--card);
+  border-radius: 28px;
+  padding: clamp(1.5rem, 3vh, 2.2rem) clamp(1.5rem, 4vw, 3rem) clamp(1.4rem, 2.5vh, 1.8rem);
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  overflow: hidden;
+}
+
+.mm-left {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mm-eyebrow {
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.mm-progress {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin-top: 1.1rem;
+  max-width: 980px;
+}
+.mm-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+.mm-bar > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transition: width 1.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.mm-pct {
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-width: 2.5rem;
+}
+
+.mm-chart {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 120px;
+  margin-top: 1.2rem;
+}
+.mm-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.mm-grid {
+  position: relative;
+  width: 64%;
+}
+.mm-grid canvas {
+  display: block;
+  width: 100%;
+}
+.mm-pulse {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.mm-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: mm-ring 2.4s ease-out infinite;
+}
+@keyframes mm-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+.mm-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  padding: 0.4rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  background: var(--ink);
+  color: var(--card);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.mm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 2rem;
+  margin-top: 1.1rem;
+  font-size: 0.9rem;
+  position: relative;
+  flex: none;
+}
+.mm-legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.mm-legend i {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  display: block;
+}
+.mm-legend .sm {
+  width: 9px;
+  height: 9px;
+}
+
+/* ---------- Stats strip ---------- */
+.mm-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem 1.25rem;
+  margin-top: 1.1rem;
+  flex: none;
+}
+.mm-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mm-stat__value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.mm-stat__label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.mm-stat__hint {
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+.mm-cta {
+  margin-top: 0.9rem;
+  align-self: flex-start;
+  flex: none;
+}
+.mm-caption {
+  margin: 0.7rem 0 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+  flex: none;
+}
+
+/* ---------- Right panel ---------- */
+.mm-panel {
+  align-self: stretch;
+  margin: 1.2rem 0 0.6rem;
+  padding: 2rem 2.2rem 1.6rem;
+  border-radius: 26px;
+  background: linear-gradient(180deg, var(--panel), var(--card) 70%);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+.mm-panel hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  margin: 0;
+}
+.mm-mantra {
+  font-style: italic;
+  margin: 0 0 1.3rem;
+  font-size: 1.05rem;
+}
+.mm-quote {
+  margin: 0 0 1.4rem;
+  padding: 0.2rem 0 0.2rem 1.1rem;
+  border-left: 3px solid var(--accent);
+  text-align: left;
+  font-style: italic;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+.mm-quote cite {
+  display: block;
+  margin-top: 0.7rem;
+  font-style: normal;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.mm-quote cite::before {
+  content: '— ';
+}
+
+.mm-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem 0.75rem;
+  margin-top: 1.4rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.35;
+}
+.mm-values div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  color: var(--muted);
+}
+.mm-values svg {
+  width: 30px;
+  height: 30px;
+  stroke: var(--muted);
+  fill: none;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Floating controls ---------- */
+.mm-controls {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 20;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1000px) {
+  .mm-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+  .mm-card {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    height: auto;
+    padding: 1.8rem 1.4rem;
+  }
+  .mm-chart {
+    flex: none;
+    height: min(560px, 65vh);
+    min-height: 0;
+  }
+  .mm-grid {
+    width: 100%;
+  }
+  .mm-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mm-panel {
+    margin: 0;
+  }
+  .mm-progress {
+    max-width: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .mm-card {
+    border-radius: 20px;
+    padding: 1.4rem 1.1rem;
+  }
+  .mm-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mm-panel {
+    padding: 1.6rem 1.3rem 1.3rem;
+  }
+  .mm-legend {
+    gap: 0.5rem 1.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-page *,
+  .mm-page *::before,
+  .mm-page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

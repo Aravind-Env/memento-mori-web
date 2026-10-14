@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { LifeGrid } from '../features/grid/LifeGrid'
-import { QuoteCard } from '../features/quote/QuoteCard'
-import { StatsPanel } from '../features/stats/StatsPanel'
+import { Dashboard } from '../features/dashboard/Dashboard'
 import { WeekDrawer } from '../features/notes/WeekDrawer'
 import { Settings } from '../features/settings/Settings'
 import { Onboarding } from '../features/onboarding/Onboarding'
-import StoicLifeAnimation from '../features/atmosphere/StoicLifeAnimation'
 import { parseISODate } from '../domain/dates'
 import { getLifeStats } from '../domain/lifeMath'
+import { getDailyQuote } from '../domain/quotes'
 import { useMidnightRefresh, usePrefersReducedMotion } from '../shared/hooks'
 import { THEME_STORAGE_KEY, useStore } from '../state/store'
 import type { Note } from '../data/model'
@@ -31,8 +29,10 @@ export function App() {
   const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated())
   const [today, setToday] = useState(() => new Date())
   const [editingWeek, setEditingWeek] = useState<number | null>(null)
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
+    document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+  )
   const [toast, setToast] = useState<Toast | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
 
@@ -52,6 +52,7 @@ export function App() {
       const resolved =
         settings.theme === 'system' ? (mql.matches ? 'dark' : 'light') : settings.theme
       document.documentElement.dataset.theme = resolved
+      setResolvedTheme(resolved)
       try {
         localStorage.setItem(THEME_STORAGE_KEY, settings.theme)
       } catch {
@@ -83,6 +84,8 @@ export function App() {
     return map
   }, [notes, profile])
 
+  const quote = useMemo(() => getDailyQuote(today), [today])
+
   const showToast = useCallback((message: string, undo?: () => void) => {
     const id = ++toastId
     setToast({ id, message, undo })
@@ -93,7 +96,6 @@ export function App() {
   }, [])
 
   const openWeek = useCallback((week: number) => {
-    setSelectedWeek(week)
     setEditingWeek(week)
   }, [])
 
@@ -139,64 +141,39 @@ export function App() {
   const reduced = settings.reduceMotion || prefersReduced
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <span className="brand">Memento Mori</span>
-        <div className="topbar__actions">
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={toggleTheme}
-            aria-label="Toggle light and dark theme"
-            title="Toggle theme"
-          >
-            ◐
-          </button>
-          <button
-            type="button"
-            className="btn btn--sm"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Open settings"
-          >
-            Settings
-          </button>
-        </div>
-      </header>
+    <div className="mm-page">
+      <div className="mm-controls">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={toggleTheme}
+          aria-label="Toggle light and dark theme"
+          title="Toggle theme"
+        >
+          ◐
+        </button>
+        <button
+          type="button"
+          className="btn btn--sm"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Open settings"
+        >
+          Settings
+        </button>
+      </div>
 
-      <main className="dashboard">
-        <section className="dashboard__grid" aria-label="Life grid">
-          <LifeGrid
-            dob={dob}
-            stats={stats}
-            notesByWeek={notesByWeek}
-            selectedWeek={selectedWeek}
-            reduceMotion={reduced}
-            onSelect={openWeek}
-          />
-          <div className="dashboard-grid-atmosphere" aria-hidden="true">
-            <StoicLifeAnimation />
-          </div>
-        </section>
-
-        <div className="dashboard__side">
-          <QuoteCard />
-          <StatsPanel
-            stats={stats}
-            gentleMode={settings.gentleMode}
-            onWriteThisWeek={() => openWeek(stats.weeksLived)}
-          />
-        </div>
-      </main>
-
-      <footer className="app__footer">
-        <span>
-          {profile.name ? `${profile.name} · ` : ''}born {profile.dob} · {profile.lifeYears}-year
-          estimate
-        </span>
-        <span className="app__shortcuts">
-          Press <kbd>N</kbd> for this week&apos;s note
-        </span>
-      </footer>
+      <Dashboard
+        stats={stats}
+        lifeYears={profile.lifeYears}
+        name={profile.name}
+        dob={profile.dob}
+        notesByWeek={notesByWeek}
+        reduceMotion={reduced}
+        themeKey={resolvedTheme}
+        gentleMode={settings.gentleMode}
+        quote={quote}
+        onSelectWeek={openWeek}
+      />
 
       {editingWeek !== null && (
         <WeekDrawer
