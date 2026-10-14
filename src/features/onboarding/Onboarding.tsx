@@ -34,7 +34,11 @@ export function Onboarding() {
 
   return (
     <main className="onboarding">
+      <OnboardingBackdrop />
       <section className="onboarding__intro">
+        <div className="onboarding__art" aria-hidden="true">
+          <HourglassArt />
+        </div>
         <p className="brand">Memento Mori</p>
         <h1 className="onboarding__title">See your life in weeks.</h1>
         <p className="onboarding__lead">
@@ -118,5 +122,55 @@ export function Onboarding() {
         </p>
       </section>
     </main>
+  )
+}
+
+/** Calm "between life and death" backdrop: a breathing glow, drifting embers and stars. */
+function OnboardingBackdrop() {
+  return (
+    <div className="onboarding__backdrop" aria-hidden="true">
+      <span className="onboarding__glow" />
+      <span className="onboarding__stars" />
+      <span className="onboarding__horizon" />
+      {Array.from({ length: 12 }, (_, i) => (
+        <span key={i} className={`ember ember--${i + 1}`} />
+      ))}
+    </div>
+  )
+}
+
+/** SVG hourglass whose sand falls in a loop, echoing time running between life and death. */
+function HourglassArt() {
+  return (
+    <svg className="hourglass" viewBox="0 0 64 96" role="presentation">
+      <defs>
+        <clipPath id="mm-top-bulb">
+          <path d="M14 10 L50 10 L34 48 L30 48 Z" />
+        </clipPath>
+        <clipPath id="mm-bottom-bulb">
+          <path d="M30 48 L34 48 L50 86 L14 86 Z" />
+        </clipPath>
+      </defs>
+
+      {/* Sand — top bulb drains while the bottom fills. */}
+      <g clipPath="url(#mm-top-bulb)">
+        <rect className="hourglass__sand hourglass__sand--top" x="12" y="10" width="40" height="40" />
+      </g>
+      <g clipPath="url(#mm-bottom-bulb)">
+        <rect className="hourglass__sand hourglass__sand--bottom" x="12" y="46" width="40" height="42" />
+      </g>
+
+      {/* Falling grain. */}
+      <rect className="hourglass__grain" x="31.2" y="48" width="1.6" height="10" />
+
+      {/* Glass and frame. */}
+      <path
+        className="hourglass__glass"
+        d="M12 8 L52 8 L36 48 L52 88 L12 88 L28 48 Z"
+        fill="none"
+      />
+      <rect className="hourglass__frame" x="8" y="4" width="48" height="5" rx="2.5" />
+      <rect className="hourglass__frame" x="8" y="87" width="48" height="5" rx="2.5" />
+    </svg>
   )
 }

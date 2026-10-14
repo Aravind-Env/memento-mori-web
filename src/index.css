@@ -737,14 +737,207 @@ kbd {
 
 /* ---------- Onboarding ---------- */
 .onboarding {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: clamp(1.5rem, 4vw, 3.5rem);
   align-items: center;
+  align-content: center;
   max-width: 1040px;
+  height: 100dvh;
   margin: 0 auto;
-  min-height: 100vh;
   padding: clamp(1.2rem, 4vw, 3rem);
+}
+.onboarding__intro,
+.onboarding__form {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Onboarding backdrop (life & death) ---------- */
+.onboarding__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* A slow, warm light on one side (life) fading into cold dark on the other (death). */
+.onboarding__glow {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(
+      42% 55% at 22% 30%,
+      color-mix(in srgb, var(--accent) 26%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      48% 60% at 82% 78%,
+      color-mix(in srgb, var(--text) 10%, transparent),
+      transparent 72%
+    );
+  animation: glowBreathe 11s ease-in-out infinite alternate;
+}
+.onboarding__stars {
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%, currentColor 50%, transparent),
+    radial-gradient(1.2px 1.2px at 28% 68%, currentColor 50%, transparent),
+    radial-gradient(1.6px 1.6px at 46% 14%, currentColor 50%, transparent),
+    radial-gradient(1.2px 1.2px at 62% 52%, currentColor 50%, transparent),
+    radial-gradient(1.4px 1.4px at 78% 28%, currentColor 50%, transparent),
+    radial-gradient(1.2px 1.2px at 88% 74%, currentColor 50%, transparent),
+    radial-gradient(1.4px 1.4px at 38% 88%, currentColor 50%, transparent),
+    radial-gradient(1.2px 1.2px at 70% 90%, currentColor 50%, transparent);
+  color: var(--muted);
+  animation: starsTwinkle 6s ease-in-out infinite alternate;
+}
+/* The horizon line — the boundary between the two. */
+.onboarding__horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    color-mix(in srgb, var(--text) 30%, transparent),
+    transparent
+  );
+  opacity: 0.6;
+}
+.ember {
+  position: absolute;
+  bottom: -8px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  filter: blur(0.4px);
+  opacity: 0;
+  animation: emberRise 9s linear infinite;
+}
+/* Embers drift upward from the "death" edge, like sparks of a life. */
+.ember--1 { left: 48%; animation-delay: 0s; }
+.ember--2 { left: 54%; animation-delay: 1.2s; animation-duration: 10s; }
+.ember--3 { left: 60%; animation-delay: 2.4s; }
+.ember--4 { left: 66%; animation-delay: 0.6s; animation-duration: 11s; }
+.ember--5 { left: 72%; animation-delay: 3.6s; }
+.ember--6 { left: 78%; animation-delay: 1.8s; animation-duration: 8.5s; }
+.ember--7 { left: 84%; animation-delay: 4.2s; }
+.ember--8 { left: 90%; animation-delay: 2.8s; animation-duration: 10.5s; }
+.ember--9 { left: 36%; animation-delay: 5s; }
+.ember--10 { left: 30%; animation-delay: 3s; animation-duration: 9.5s; }
+.ember--11 { left: 42%; animation-delay: 6.2s; }
+.ember--12 { left: 24%; animation-delay: 4.8s; animation-duration: 12s; }
+
+@keyframes glowBreathe {
+  from {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+@keyframes starsTwinkle {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0.65;
+  }
+}
+@keyframes emberRise {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.8);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-72vh) translateX(14px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* ---------- Hourglass ---------- */
+.onboarding__art {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.4rem;
+}
+.hourglass {
+  width: 66px;
+  height: 100px;
+  overflow: visible;
+  filter: drop-shadow(0 6px 20px color-mix(in srgb, var(--accent) 22%, transparent));
+}
+.hourglass__glass {
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.hourglass__frame {
+  fill: var(--muted);
+}
+.hourglass__sand {
+  fill: var(--accent);
+}
+.hourglass__sand--top {
+  transform-origin: 32px 10px;
+  animation: sandDrain 8s ease-in-out infinite;
+}
+.hourglass__sand--bottom {
+  transform-origin: 32px 88px;
+  animation: sandFill 8s ease-in-out infinite;
+}
+.hourglass__grain {
+  fill: var(--accent);
+  animation: grainFall 8s ease-in-out infinite;
+}
+@keyframes sandDrain {
+  0%,
+  6% {
+    transform: scaleY(1);
+  }
+  88%,
+  100% {
+    transform: scaleY(0.06);
+  }
+}
+@keyframes sandFill {
+  0%,
+  6% {
+    transform: scaleY(0.06);
+  }
+  88%,
+  100% {
+    transform: scaleY(1);
+  }
+}
+@keyframes grainFall {
+  0%,
+  8%,
+  100% {
+    opacity: 0;
+  }
+  20%,
+  72% {
+    opacity: 1;
+  }
 }
 .onboarding__title {
   font-size: clamp(2rem, 4.5vw, 3rem);
@@ -844,8 +1037,27 @@ kbd {
   }
   .onboarding {
     grid-template-columns: 1fr;
-    align-items: start;
-    padding-top: 2rem;
+    align-items: center;
+    align-content: center;
+    gap: 1.2rem;
+    padding: clamp(1rem, 5vw, 1.6rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .onboarding__art {
+    display: none;
+  }
+  .onboarding__title {
+    font-size: clamp(1.6rem, 7vw, 2.2rem);
+  }
+  .onboarding__lead {
+    font-size: 0.95rem;
+  }
+  .onboarding__points {
+    margin-top: 1rem;
+  }
+  .onboarding__form {
+    gap: 0.8rem;
   }
 }
 
@@ -884,5 +1096,23 @@ kbd {
   }
   .stats__bar-fill {
     transition: none;
+  }
+  .onboarding__glow,
+  .onboarding__stars,
+  .ember,
+  .hourglass__sand--top,
+  .hourglass__sand--bottom,
+  .hourglass__grain {
+    animation: none;
+  }
+  .ember,
+  .hourglass__grain {
+    opacity: 0;
+  }
+  .hourglass__sand--top {
+    transform: scaleY(1);
+  }
+  .hourglass__sand--bottom {
+    transform: scaleY(0.5);
   }
 }
