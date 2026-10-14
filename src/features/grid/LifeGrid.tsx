@@ -124,6 +124,10 @@ export function LifeGrid({
 
   return (
     <div className={`life-grid${reduceMotion ? ' reduce-motion' : ''}`}>
+      <div className="life-grid__aura" aria-hidden="true">
+        <span className="life-grid__glow" />
+        <GeometryBackdrop />
+      </div>
       <div className="life-grid__scroll" ref={scrollRef}>
         <div className="life-grid__inner">
           <div className="life-grid__toprow" style={{ paddingLeft: ROW_LABEL_W }}>
@@ -168,6 +172,7 @@ export function LifeGrid({
                     gridTemplateColumns: `repeat(${WEEKS_PER_YEAR}, ${cellSize}px)`,
                     gridTemplateRows: `${cellSize}px`,
                     gap,
+                    animationDelay: `${Math.min(row, 45) * 22}ms`,
                   }}
                 >
                   {Array.from({ length: WEEKS_PER_YEAR }, (_, col) => {
@@ -203,6 +208,55 @@ export function LifeGrid({
         <li><span className="swatch swatch--future" /> Ahead</li>
         <li><span className="swatch swatch--note" /> Has note</li>
       </ul>
+    </div>
+  )
+}
+
+/** Sacred-geometry backdrop: slowly counter-rotating rings, polygons and spokes. */
+function GeometryBackdrop() {
+  const spokes = Array.from({ length: 12 }, (_, i) => {
+    const a = (i * 30 * Math.PI) / 180
+    return (
+      <line
+        key={i}
+        x1={200 + Math.cos(a) * 50}
+        y1={200 + Math.sin(a) * 50}
+        x2={200 + Math.cos(a) * 190}
+        y2={200 + Math.sin(a) * 190}
+      />
+    )
+  })
+
+  return (
+    <div className="life-grid__geometry-layer">
+      <svg
+        className="life-grid__geometry"
+        viewBox="0 0 400 400"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden="true"
+      >
+        <g className="geo geo--a">
+          <circle cx="200" cy="200" r="190" />
+          <circle cx="200" cy="200" r="142" />
+          <circle cx="200" cy="200" r="94" />
+          <circle cx="200" cy="200" r="50" />
+          {spokes}
+        </g>
+        <g className="geo geo--b">
+          <polygon points="200,20 356,290 44,290" />
+          <polygon points="200,380 44,110 356,110" />
+        </g>
+        <g className="geo geo--c">
+          <polygon points="200,58 322,200 200,342 78,200" />
+          <rect x="112" y="112" width="176" height="176" />
+        </g>
+      </svg>
+
+      <span className="geo-shape geo-shape--ring" />
+      <span className="geo-shape geo-shape--tri" />
+      <span className="geo-shape geo-shape--sq" />
+      <span className="geo-shape geo-shape--ring geo-shape--sm" />
+      <span className="geo-shape geo-shape--tri geo-shape--flip" />
     </div>
   )
 }

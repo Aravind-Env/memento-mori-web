@@ -37,7 +37,7 @@ export function Onboarding() {
       <OnboardingBackdrop />
       <section className="onboarding__intro">
         <div className="onboarding__art" aria-hidden="true">
-          <HourglassArt />
+          <LifeDeathArt />
         </div>
         <p className="brand">Memento Mori</p>
         <h1 className="onboarding__title">See your life in weeks.</h1>
@@ -139,38 +139,41 @@ function OnboardingBackdrop() {
   )
 }
 
-/** SVG hourglass whose sand falls in a loop, echoing time running between life and death. */
-function HourglassArt() {
+/**
+ * Animated "life and death" illustration: a warm, beating heart whose heartbeat
+ * line runs across the frame and settles into a cold, flat line — life fading
+ * into death — while leaves drift down from the far side. Loops slowly.
+ */
+function LifeDeathArt() {
   return (
-    <svg className="hourglass" viewBox="0 0 64 96" role="presentation">
+    <svg className="lifedeath" viewBox="0 0 260 104" role="presentation">
       <defs>
-        <clipPath id="mm-top-bulb">
-          <path d="M14 10 L50 10 L34 48 L30 48 Z" />
-        </clipPath>
-        <clipPath id="mm-bottom-bulb">
-          <path d="M30 48 L34 48 L50 86 L14 86 Z" />
-        </clipPath>
+        <linearGradient id="mm-life-death" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" className="lifedeath__stop lifedeath__stop--life" />
+          <stop offset="55%" className="lifedeath__stop lifedeath__stop--life" />
+          <stop offset="100%" className="lifedeath__stop lifedeath__stop--death" />
+        </linearGradient>
       </defs>
 
-      {/* Sand — top bulb drains while the bottom fills. */}
-      <g clipPath="url(#mm-top-bulb)">
-        <rect className="hourglass__sand hourglass__sand--top" x="12" y="10" width="40" height="40" />
-      </g>
-      <g clipPath="url(#mm-bottom-bulb)">
-        <rect className="hourglass__sand hourglass__sand--bottom" x="12" y="46" width="40" height="42" />
-      </g>
-
-      {/* Falling grain. */}
-      <rect className="hourglass__grain" x="31.2" y="48" width="1.6" height="10" />
-
-      {/* Glass and frame. */}
+      {/* Life: a heart that beats, with a soft expanding halo. */}
+      <circle className="lifedeath__halo" cx="34" cy="36" r="22" />
       <path
-        className="hourglass__glass"
-        d="M12 8 L52 8 L36 48 L52 88 L12 88 L28 48 Z"
-        fill="none"
+        className="lifedeath__heart"
+        d="M34 26c-4-7-16-5-16 4 0 9 16 19 16 19s16-10 16-19c0-9-12-11-16-4z"
       />
-      <rect className="hourglass__frame" x="8" y="4" width="48" height="5" rx="2.5" />
-      <rect className="hourglass__frame" x="8" y="87" width="48" height="5" rx="2.5" />
+
+      {/* The pulse: sharp beats at first, then a long flat line toward the end. */}
+      <path
+        className="lifedeath__line"
+        pathLength={100}
+        d="M6 64H46l5-20 9 40 9-30 5 10H112H250"
+      />
+
+      {/* Death: leaves falling away from the flat (cold) side of the line. */}
+      <ellipse className="lifedeath__leaf lifedeath__leaf--1" cx="158" cy="26" rx="3" ry="5" />
+      <ellipse className="lifedeath__leaf lifedeath__leaf--2" cx="186" cy="40" rx="3" ry="5" />
+      <ellipse className="lifedeath__leaf lifedeath__leaf--3" cx="214" cy="20" rx="3" ry="5" />
+      <ellipse className="lifedeath__leaf lifedeath__leaf--4" cx="238" cy="38" rx="3" ry="5" />
     </svg>
   )
 }
