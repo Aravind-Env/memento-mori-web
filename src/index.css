@@ -260,9 +260,24 @@ kbd {
   margin: 0 auto;
 }
 .dashboard__grid {
+  position: relative;
+  isolation: isolate;
   display: flex;
   min-width: 0;
   min-height: 0;
+}
+/* Decorative Stoic landscape sitting behind the life grid. */
+.dashboard-grid-atmosphere {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.dashboard-grid-atmosphere .stoic-scene {
+  background: transparent;
+  border-radius: inherit;
 }
 .dashboard__side {
   position: static;
@@ -276,16 +291,18 @@ kbd {
 /* ---------- Life grid ---------- */
 .life-grid {
   position: relative;
+  z-index: 1;
   display: flex;
   flex: 1;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: clamp(0.8rem, 2vw, 1.25rem);
+  backdrop-filter: blur(6px);
 }
 /* Animated aura behind the grid cells (life breathing under the surface). */
 .life-grid__aura {

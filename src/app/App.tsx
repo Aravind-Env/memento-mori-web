@@ -6,6 +6,7 @@ import { StatsPanel } from '../features/stats/StatsPanel'
 import { WeekDrawer } from '../features/notes/WeekDrawer'
 import { Settings } from '../features/settings/Settings'
 import { Onboarding } from '../features/onboarding/Onboarding'
+import StoicLifeAnimation from '../features/atmosphere/StoicLifeAnimation'
 import { parseISODate } from '../domain/dates'
 import { getLifeStats } from '../domain/lifeMath'
 import { useMidnightRefresh, usePrefersReducedMotion } from '../shared/hooks'
@@ -172,6 +173,9 @@ export function App() {
             reduceMotion={reduced}
             onSelect={openWeek}
           />
+          <div className="dashboard-grid-atmosphere" aria-hidden="true">
+            <StoicLifeAnimation />
+          </div>
         </section>
 
         <div className="dashboard__side">
