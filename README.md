@@ -34,6 +34,7 @@ We all know time is limited, but it stays abstract. Turning it into a grid of ~4
 - **Daily Stoic quote** — drawn from an offline library, stable for the whole day.
 - **Gentle mode** — hides the "weeks left" figures and the shared-time counts for a softer experience.
 - **Themes** — light, dark, or follow the system, with no flash of the wrong theme on load.
+- **Cosmic dawn backdrop** — a fixed full-page photo ("Cosmic Dawn Over the Misty Mountains") painted behind the app, with a theme-aware scrim so text stays readable in both themes.
 - **Bonus time** — past your expected lifespan, extra accent-coloured weeks are added instead of stopping.
 - **Backup & restore** — export/import a JSON file; encrypted backups add an AES-GCM layer (PBKDF2 from your passphrase, 250k iterations) — wrong passphrases fail cleanly, plain backups still import, and no passphrase or key is ever stored.
 - **App lock** — optional passphrase gate on open; the lock stores only an encrypted constant for verification, so forgetting the passphrase means the data waits (any unencrypted backup restores you).
@@ -78,9 +79,10 @@ src/
     insights/    mood heatmaps and tag stats (InsightsPanel)
     search/      command palette (CommandPalette)
     people/      people & shared time (PeoplePanel)
-  domain/      Pure logic: dates.ts, lifeMath.ts, chapters.ts, quotes.ts
-  data/        Types + storage model (Profile, Note, Chapter, Settings)  state/       Zustand store (persisted)
+  domain/      Pure logic: lifeMath, dates, chapters, goals, insights, review, search, sharedTime, zoom, crypto, quotes — all unit-tested
+  data/        Types + storage model (Profile, Note, Chapter, Goal, Relationship, Settings)  state/       Zustand store (persisted)
   shared/      Reusable hooks
+  assets/      Static art (cosmic-dawn.jpg backdrop)
 ```
 
 **Data flow (simplified):**
