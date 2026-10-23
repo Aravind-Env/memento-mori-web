@@ -1,0 +1,85 @@
+/* Goals manager — reuses the shared drawer, fields and button styles. */
+.goals__lead {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.goals__empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  padding: 0.5rem 0;
+}
+.goals__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.goal-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 10px;
+}
+.goal-row:hover {
+  background: var(--bg);
+}
+.goal-row__marker {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  background: transparent;
+  border: 2px solid var(--accent2);
+}
+.goal-row.is-done .goal-row__marker {
+  background: var(--accent2);
+}
+.goal-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.goal-row__text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.goal-row.is-done .goal-row__text {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.goal-row__meta {
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.goal-row__tick {
+  border-color: var(--accent2);
+  color: var(--accent2);
+}
+
+.goal-form {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg);
+}
+
+@media (max-width: 560px) {
+  .goal-row {
+    flex-wrap: wrap;
+  }
+}

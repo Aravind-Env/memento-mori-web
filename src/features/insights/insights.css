@@ -1,0 +1,155 @@
+/* ============================================================
+   Insights — read-only patterns from weekly notes
+   Mood heatmap, top tags, busiest years. No streaks, no guilt.
+   ============================================================ */
+
+.insights__empty {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.insights__stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+}
+.insights__stats li {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.insights__stats strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.insights__heading {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.insights__heat {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.insights__heat-row {
+  display: grid;
+  grid-template-columns: 4.6rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+.insights__heat-age {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.insights__heat-cells {
+  display: grid;
+  grid-template-columns: repeat(52, 1fr);
+  gap: 2px;
+}
+.insights__heat-cells i {
+  height: 10px;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--track);
+  opacity: 0.35;
+}
+.insights__heat-cells i[title] {
+  opacity: 1;
+}
+.insights__scale {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.insights__scale i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.insights__tags {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.insights__tags li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 99px;
+  background: var(--track);
+  font-size: 0.82rem;
+}
+.insights__tags em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.insights__busy {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.insights__busy li {
+  display: grid;
+  grid-template-columns: 4.6rem 1fr 4.4rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+.insights__busy-age {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.insights__busy i {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--accent);
+  opacity: 0.45;
+  min-width: 6px;
+}
+.insights__busy-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .insights__heat-row,
+  .insights__busy li {
+    grid-template-columns: 3.6rem 1fr;
+  }
+  .insights__busy-count {
+    grid-column: 2;
+    text-align: left;
+  }
+}

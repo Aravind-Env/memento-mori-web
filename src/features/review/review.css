@@ -1,0 +1,53 @@
+/* ============================================================
+   Weekly review — last week beside a fresh intention.
+   Calm by construction: no streaks, no guilt, skippable forever.
+   ============================================================ */
+
+.review__past .review__heading {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.review__quote {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  background: var(--track);
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.review__mood {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.review__empty {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  background: var(--track);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.review__range {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.drawer__foot {
+  gap: 0.6rem;
+}
+.drawer__foot .btn {
+  flex-shrink: 0;
+}

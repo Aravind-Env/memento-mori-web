@@ -25,6 +25,21 @@
   --hill: #3b3d43;
   --sun: #fde7d0;
   --sky: #f8b98a;
+  /* Chapter palette (light): calm mid-tones, distinct from --accent. */
+  --ch-teal: #22968e;
+  --ch-blue: #4079c4;
+  --ch-violet: #7a59c9;
+  --ch-amber: #b07618;
+  --ch-leaf: #548f3c;
+  --ch-rose: #bc5f86;
+  --ch-slate: #59788e;
+  --ch-sea: #2e7fa8;
+  /* Mood scale 1-5 for the insights heatmap: quiet earth tones, no alarm. */
+  --mood1: #b7846b;
+  --mood2: #cf9a67;
+  --mood3: #c3a95f;
+  --mood4: #8faa6d;
+  --mood5: #4f9e8c;
   --shadow: 0 20px 60px rgba(60, 40, 20, 0.08);
 }
 
@@ -49,6 +64,20 @@
   --m1: #3a3d47;
   --m2: #30333c;
   --m3: #262830;
+  /* Chapter palette (dark): lightened for the dark canvas. */
+  --ch-teal: #45c2b4;
+  --ch-blue: #7fa6e8;
+  --ch-violet: #ab8ded;
+  --ch-amber: #e0a95d;
+  --ch-leaf: #86c46f;
+  --ch-rose: #e387ae;
+  --ch-slate: #8fb0c0;
+  --ch-sea: #63aede;
+  --mood1: #b58b78;
+  --mood2: #c9a173;
+  --mood3: #b9a96a;
+  --mood4: #8ba877;
+  --mood5: #5fae9e;
   --hill: #0d0e12;
   --sun: #6d4a38;
   --sky: #c0744a;
@@ -185,6 +214,11 @@ kbd {
 }
 .icon-btn:hover {
   background: var(--border);
+}
+.icon-btn--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
 }
 
 /* ---------- Fields ---------- */

@@ -1,0 +1,99 @@
+/* Chapters manager — reuses the shared drawer, fields and button styles. */
+.chapters__lead {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.chapters__empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  padding: 0.6rem 0;
+}
+.chapters__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.chapter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 10px;
+}
+.chapter-row:hover,
+.chapter-row.is-editing {
+  background: var(--bg);
+}
+.chapter-row__chip {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex: none;
+}
+.chapter-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chapter-row__meta {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.chapter-form {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg);
+}
+.chapter-form__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch:hover {
+  transform: scale(1.08);
+}
+.swatch.is-active {
+  border-color: var(--text);
+  box-shadow:
+    inset 0 0 0 2px var(--surface),
+    inset 0 0 0 3px var(--surface);
+}
+
+@media (max-width: 560px) {
+  .chapter-row {
+    flex-wrap: wrap;
+  }
+  .chapter-row__meta {
+    flex-basis: 100%;
+    padding-left: 1.4rem;
+  }
+}

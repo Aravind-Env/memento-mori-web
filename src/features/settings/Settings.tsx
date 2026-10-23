@@ -3,6 +3,15 @@ import { useRef, useState } from 'react'
 import { MiniGrid } from '../grid/MiniGrid'
 import { parseISODate, toISODate } from '../../domain/dates'
 import { MAX_LIFE_YEARS, MIN_LIFE_YEARS } from '../../domain/lifeMath'
+import { DAY_SHORT } from '../../domain/review'
+import {
+  VaultError,
+  decryptJSON,
+  encryptJSON,
+  isEncryptedEnvelope,
+  makeLockRecord,
+} from '../../domain/crypto'
+import { PassphraseDialog } from './PassphraseDialog'
 import { useStore } from '../../state/store'
 import type { Theme } from '../../data/model'
 
@@ -20,16 +29,41 @@ const THEMES: { value: Theme; label: string }[] = [
 export function Settings({ onClose, onToast }: SettingsProps) {
   const profile = useStore((s) => s.profile)
   const settings = useStore((s) => s.settings)
+  const vault = useStore((s) => s.vault)
   const updateProfile = useStore((s) => s.updateProfile)
   const setTheme = useStore((s) => s.setTheme)
   const setGentleMode = useStore((s) => s.setGentleMode)
   const setReduceMotion = useStore((s) => s.setReduceMotion)
+  const setReminderDay = useStore((s) => s.setReminderDay)
+  const setVault = useStore((s) => s.setVault)
   const exportJSON = useStore((s) => s.exportJSON)
   const importJSON = useStore((s) => s.importJSON)
   const clearProfile = useStore((s) => s.clearProfile)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const supported = typeof window !== 'undefined' && 'Notification' in window
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(() =>
+    'Notification' in window ? Notification.permission : 'unsupported',
+  )
+
+  type VaultDialog =
+    | { kind: 'hidden' }
+    | { kind: 'export' }
+    | { kind: 'import' }
+    | { kind: 'lock' }
+  const [vaultDialog, setVaultDialog] = useState<VaultDialog>({ kind: 'hidden' })
+  /** Unparsed encrypted file text awaiting a passphrase. */
+  const [pendingImportText, setPendingImportText] = useState<string | null>(null)
+  const [vaultBusy, setVaultBusy] = useState(false)
+  const [vaultError, setVaultError] = useState<string | null>(null)
+
+  function closeVaultDialog() {
+    setVaultDialog({ kind: 'hidden' })
+    setPendingImportText(null)
+    setVaultBusy(false)
+    setVaultError(null)
+  }
 
   if (!profile) return null
   const dobDate = parseISODate(profile.dob)
@@ -45,16 +79,104 @@ export function Settings({ onClose, onToast }: SettingsProps) {
     onToast('Backup downloaded')
   }
 
-  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = importJSON(String(reader.result ?? ''))
-      onToast(result.ok ? 'Data imported' : result.error ?? 'Import failed')
-    }
-    reader.readAsText(file)
+    const text = await file.text()
     e.target.value = ''
+    try {
+      const parsed: unknown = JSON.parse(text)
+      if (isEncryptedEnvelope(parsed)) {
+        setPendingImportText(text)
+        setVaultDialog({ kind: 'import' })
+        return
+      }
+    } catch {
+      /* fall through to the plain-path error reporting */
+    }
+    const result = importJSON(text)
+    onToast(result.ok ? 'Data imported' : result.error ?? 'Import failed')
+  }
+
+  async function runEncryptedExport(passphrase: string) {
+    setVaultBusy(true)
+    setVaultError(null)
+    try {
+      const envelope = await encryptJSON(exportJSON(), passphrase)
+      const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `memento-mori-vault-${toISODate(new Date())}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      onToast('Encrypted backup downloaded')
+      closeVaultDialog()
+    } catch (err) {
+      setVaultError(err instanceof VaultError ? err.message : 'Encryption is unavailable here.')
+    } finally {
+      setVaultBusy(false)
+    }
+  }
+
+  async function runEncryptedImport(passphrase: string) {
+    if (pendingImportText == null) return
+    setVaultBusy(true)
+    setVaultError(null)
+    try {
+      const envelope: unknown = JSON.parse(pendingImportText)
+      const json = await decryptJSON(envelope, passphrase)
+      const result = importJSON(json)
+      if (result.ok) {
+        onToast('Encrypted backup restored')
+        closeVaultDialog()
+      } else {
+        setVaultError(result.error ?? 'Import failed')
+      }
+    } catch (err) {
+      setVaultError(err instanceof VaultError ? err.message : 'Could not decrypt that file.')
+    } finally {
+      setVaultBusy(false)
+    }
+  }
+
+  async function runEnableLock(passphrase: string) {
+    setVaultBusy(true)
+    setVaultError(null)
+    try {
+      const record = await makeLockRecord(passphrase)
+      setVault(record, true)
+      onToast('App lock on — it asks for your passphrase on the next load')
+      closeVaultDialog()
+    } catch {
+      setVaultError('The app lock could not be set up here.')
+    } finally {
+      setVaultBusy(false)
+    }
+  }
+
+  function handleLockToggle() {
+    if (!settings.appLock && !vault) {
+      setVaultDialog({ kind: 'lock' })
+      return
+    }
+    setVault(null, false)
+    onToast('App lock off')
+  }
+
+  async function handleNotifyToggle() {
+    if (!supported) return
+    if (Notification.permission === 'granted') {
+      onToast('Permission already granted — manage it in your browser settings')
+      return
+    }
+    try {
+      const permission = await Notification.requestPermission()
+      setNotifPermission(permission)
+      onToast(permission === 'granted' ? 'Reminders on' : 'No reminder without permission')
+    } catch {
+      onToast('Browser refused the request')
+    }
   }
 
   return (
@@ -146,14 +268,59 @@ export function Settings({ onClose, onToast }: SettingsProps) {
         </section>
 
         <section className="settings__section">
+          <h3 className="settings__heading">Weekly review</h3>
+          <p className="settings__note">
+            Pick one quiet day for the ritual: last week's note beside a fresh intention. Skipping
+            a week never puts you behind.
+          </p>
+          <div className="segmented" role="group" aria-label="Review reminder day">
+            {DAY_SHORT.map((label, day) => (
+              <button
+                key={day}
+                type="button"
+                className={`segmented__btn${settings.reminderDay === day ? ' is-active' : ''}`}
+                aria-pressed={settings.reminderDay === day}
+                onClick={() => setReminderDay(settings.reminderDay === day ? undefined : day)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              disabled={!supported || notifPermission === 'granted'}
+              checked={notifPermission === 'granted'}
+              onChange={handleNotifyToggle}
+            />
+            <span>
+              Local reminder
+              {supported ? '' : ' — not supported here'}
+              {supported && notifPermission === 'denied' ? ' — permission blocked' : ''}
+            </span>
+          </label>
+          <p className="settings__note">
+            A calm one-time nudge when the app is open; asking by itself never happens without
+            your click.
+          </p>
+        </section>
+
+        <section className="settings__section">
           <h3 className="settings__heading">Data</h3>
           <p className="settings__note">
             Your weeknotes, profile and settings live only on this device. Export a JSON backup any
-            time, or import one to restore.
+            time (plain or encrypted), or import one to restore.
           </p>
           <div className="settings__actions">
             <button type="button" className="btn" onClick={handleExport}>
               Export backup
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setVaultDialog({ kind: 'export' })}
+            >
+              Encrypted backup…
             </button>
             <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
               Import backup
@@ -166,6 +333,22 @@ export function Settings({ onClose, onToast }: SettingsProps) {
               onChange={handleImportFile}
             />
           </div>
+        </section>
+
+        <section className="settings__section">
+          <h3 className="settings__heading">Privacy</h3>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.appLock === true && vault != null}
+              onChange={handleLockToggle}
+            />
+            <span>App lock — ask for a passphrase when the app opens</span>
+          </label>
+          <p className="settings__note">
+            The lock derives one key from your passphrase to verify it, then forgets everything.
+            There is no recovery without the passphrase, but any backup file restores you.
+          </p>
         </section>
 
         <section className="settings__section settings__section--danger">
@@ -206,6 +389,45 @@ export function Settings({ onClose, onToast }: SettingsProps) {
           local support line. Life expectancy here is a statistical estimate, not a prediction.
         </p>
       </div>
+
+      {vaultDialog.kind === 'export' && (
+        <PassphraseDialog
+          mode="create"
+          title="Encrypted backup"
+          description="Files on disk are readable by anyone with them — this keeps the backup itself unreadable without your passphrase."
+          confirmLabel="Create encrypted backup"
+          busy={vaultBusy}
+          error={vaultError}
+          onConfirm={runEncryptedExport}
+          onClose={closeVaultDialog}
+        />
+      )}
+
+      {vaultDialog.kind === 'import' && (
+        <PassphraseDialog
+          mode="unlock"
+          title="Encrypted backup"
+          description="Type the passphrase this file was written with."
+          confirmLabel="Restore"
+          busy={vaultBusy}
+          error={vaultError}
+          onConfirm={runEncryptedImport}
+          onClose={closeVaultDialog}
+        />
+      )}
+
+      {vaultDialog.kind === 'lock' && (
+        <PassphraseDialog
+          mode="create"
+          title="Set the app-lock passphrase"
+          description="You will type this each time the app opens."
+          confirmLabel="Turn on app lock"
+          busy={vaultBusy}
+          error={vaultError}
+          onConfirm={runEnableLock}
+          onClose={closeVaultDialog}
+        />
+      )}
     </div>
   )
 }

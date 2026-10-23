@@ -1,0 +1,87 @@
+/* ============================================================
+   Passphrase dialog + app lock — vault UI.
+   Honest, plain, keyboard-first; no gimmicks in a security gate.
+   ============================================================ */
+
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.15s ease;
+}
+
+.passdialog {
+  width: min(360px, 92vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  animation: paletteIn 0.16s ease;
+}
+.passdialog__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.passdialog__desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.passdialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.passdialog__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+.passdialog__note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.applock-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+.applock {
+  width: min(340px, 100%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.applock__title {
+  margin: 0;
+  font-size: 1.3rem;
+}
+.applock__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.applock__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+}

@@ -1,0 +1,87 @@
+/* People & shared time — same drawer language as goals and review. */
+
+.people__lead {
+  font-size: var(--text-sm, 0.9rem);
+  line-height: 1.5;
+  color: var(--text-2, #5a6472);
+  margin: 0 0 0.75rem;
+}
+
+.people__empty {
+  font-size: var(--text-sm, 0.9rem);
+  color: var(--text-2, #5a6472);
+  font-style: italic;
+  margin: 0 0 0.75rem;
+}
+
+.people__list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.people-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--line, #e2e5ea);
+  background: var(--surface-2, #f7f8fa);
+}
+
+.people-row__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.people-row__name {
+  font-weight: 600;
+  font-size: var(--text-sm, 0.9rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-row__meta {
+  font-size: 0.78rem;
+  color: var(--text-2, #5a6472);
+}
+
+.people-row__count {
+  font-size: var(--text-sm, 0.9rem);
+  color: var(--text-1, #262b33);
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.people-row__why {
+  font-size: 0.72rem;
+  font-style: normal;
+  color: var(--text-2, #5a6472);
+  max-width: 18rem;
+  text-align: right;
+}
+
+.people-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-top: 1px solid var(--line, #e2e5ea);
+  padding-top: 0.75rem;
+}
+
+.people-form__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}

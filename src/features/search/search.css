@@ -1,0 +1,117 @@
+/* ============================================================
+   Command palette — Ctrl/Cmd+K search over weekly notes.
+   Keyboard-first, calm, and entirely on-device.
+   ============================================================ */
+
+.palette-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.42);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 11vh 1rem 2rem;
+  animation: fadeIn 0.15s ease;
+}
+
+.palette {
+  width: min(620px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: paletteIn 0.16s ease;
+}
+@keyframes paletteIn {
+  from {
+    transform: translateY(-8px);
+    opacity: 0.5;
+  }
+}
+
+.palette__input {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.02rem;
+  padding: 0.85rem 1rem;
+  outline: none;
+}
+.palette__input::placeholder {
+  color: var(--muted);
+}
+
+.palette__list {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 0.3rem 0 0.5rem;
+}
+
+.palette__hint,
+.palette__empty,
+.palette__group,
+.palette__more {
+  margin: 0;
+  padding: 0.55rem 1rem 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.palette__group {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding-top: 0.9rem;
+}
+.palette__hint code {
+  font-size: 0.75rem;
+}
+
+.palette__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+.palette__row.is-selected {
+  background: var(--track);
+}
+.palette__label {
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+.palette__meta {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: right;
+}
+.palette__chip {
+  text-decoration: none;
+  display: block;
+}
+
+.palette__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+@media (max-width: 480px) {
+  .palette-scrim {
+    padding-top: 6vh;
+  }
+}

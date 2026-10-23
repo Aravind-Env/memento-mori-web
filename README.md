@@ -22,18 +22,26 @@ We all know time is limited, but it stays abstract. Turning it into a grid of ~4
 ## Features
 
 - **Life grid** — 52 columns (weeks) × rows (years of age), rendered on a canvas so 4,000+ dots stay fast.
+- **Zoom views** — see the whole life, one decade of ages, or a single year (13 weeks per column) via the Life/Decade/Year switch or the `Z` key. Zoomed views land on the current week and can be stepped through with `‹ ›`.
+- **Life chapters** — name and colour week ranges (school, career, family…); painted as bands on the grid with a legend. Overlapping ranges are rejected, and deletions can be undone.
+- **Goals & milestones** — pin a goal to any future week (it shows a soft ring on the grid), tick it off (a quiet diamond), and see the count ahead in the stats.
 - **Live stats** — days, weeks, months, and years lived; weeks left; percent of life lived; next-birthday countdown.
 - **Weekly notes** — click any cell to write a reflection (past) or an intention (future). Autosaves, no save button.
 - **Mood + tags** — rate a week 1–5 and tag it (e.g. `health, work, family`). Cells with notes are marked on the grid.
+- **Insights** — a calm read-only panel over your notes: mood-by-year heatmap, most-used tags, busiest years, and coverage of weeks lived. Nothing is shown until notes exist.
+- **Weekly review** — pick a day of the week; on that day a ready chip appears with last week's note beside a fresh intention. Skipped weeks carry no penalty, and an optional local reminder needs your explicit permission first.
+- **Search & command palette** — `Ctrl/Cmd+K`: full-text note search with `#tag` and `mood:1-5` filters, jump straight to any week/age (or "now"), and matching weeks get soft rings on the grid. Everything stays on the device.
 - **Daily Stoic quote** — drawn from an offline library, stable for the whole day.
-- **Gentle mode** — hides the "weeks left" figures for a softer experience.
+- **Gentle mode** — hides the "weeks left" figures and the shared-time counts for a softer experience.
 - **Themes** — light, dark, or follow the system, with no flash of the wrong theme on load.
 - **Bonus time** — past your expected lifespan, extra accent-coloured weeks are added instead of stopping.
-- **Backup & restore** — export/import a JSON file; your data never leaves the device otherwise.
+- **Backup & restore** — export/import a JSON file; encrypted backups add an AES-GCM layer (PBKDF2 from your passphrase, 250k iterations) — wrong passphrases fail cleanly, plain backups still import, and no passphrase or key is ever stored.
+- **App lock** — optional passphrase gate on open; the lock stores only an encrypted constant for verification, so forgetting the passphrase means the data waits (any unencrypted backup restores you).
+- **People & shared time** — list the people you see regularly with a visits-per-year number; the panel computes *about N visits left* from the shorter of your two remaining estimates (add their birth date to sharpen it). Without a birth date the count stays honest and unknown. Hidden entirely in gentle mode.
 - **PWA** — installable and works offline via a service worker.
 - **Accessible & calm** — keyboard shortcuts, `prefers-reduced-motion` support, and a manual reduce-motion toggle.
 
-**Keyboard:** `N` opens the current week's note · `Esc` closes any overlay.
+**Keyboard:** `Ctrl/Cmd+K` searches notes and jumps · `N` opens the current week's note · `Z` cycles the zoom level · `Esc` closes any overlay.
 
 ---
 
@@ -61,12 +69,17 @@ src/
   features/    UI by area
     onboarding/  first-run profile setup
     dashboard/   the hero card: grid, stats, quote (Dashboard, WeekCanvas, LandscapeScene)
+    chapters/    life-chapter manager (ChaptersPanel)
+    goals/       goals & milestones (GoalsPanel)
     grid/        MiniGrid preview
     notes/       WeekDrawer — the note editor
     settings/    profile, appearance, import/export, reset
-  domain/      Pure logic: dates.ts, lifeMath.ts, quotes.ts
-  data/        Types + storage model (Profile, Note, Settings)
-  state/       Zustand store (persisted)
+    review/      weekly review ritual (ReviewPanel)
+    insights/    mood heatmaps and tag stats (InsightsPanel)
+    search/      command palette (CommandPalette)
+    people/      people & shared time (PeoplePanel)
+  domain/      Pure logic: dates.ts, lifeMath.ts, chapters.ts, quotes.ts
+  data/        Types + storage model (Profile, Note, Chapter, Settings)  state/       Zustand store (persisted)
   shared/      Reusable hooks
 ```
 
@@ -106,12 +119,15 @@ Every function in `src/domain/lifeMath.ts` and `src/domain/dates.ts` is **pure**
 ### Data model
 
 ```ts
-Profile  { id, name, dob: 'YYYY-MM-DD', lifeYears, leapRule, createdAt }
-Note     { id, profileId, weekIndex, text, mood?, tags[], pinned, createdAt, updatedAt }
-Settings { theme, gentleMode, reduceMotion }
+Profile    { id, name, dob: 'YYYY-MM-DD', lifeYears, leapRule, createdAt }
+Note       { id, profileId, weekIndex, text, mood?, tags[], pinned, createdAt, updatedAt }
+Chapter    { id, profileId, name, startWeek, endWeek, color }
+Goal       { id, profileId, weekIndex, text, done }
+Relationship { id, profileId, name, kind, visitsPerYear, dob? }
+Settings   { theme, gentleMode, reduceMotion, zoom: 'life' | 'decade' | 'year' }
 ```
 
-Notes store a `weekIndex` (an integer), never a date — the calendar range is derived from the DOB, so changing your birth date re-maps cleanly.
+Notes, chapters, goals and people store week indexes / plain data (integers, never derived dates) — the calendar ranges are derived from the DOB, so changing your birth date re-maps everything cleanly. Chapters never overlap; goals only use future weeks at creation. The persisted schema is versioned (`SCHEMA_VERSION = 7`) and old saves migrate automatically. The app-lock verification record never contains the passphrase or a usable key.
 
 ---
 
