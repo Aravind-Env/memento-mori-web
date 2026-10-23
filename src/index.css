@@ -4,6 +4,7 @@
 
   color-scheme: light;
   --bg: #f6f3ec;
+  --bg-scrim: rgba(246, 243, 236, 0.88);
   --surface: #fcfaf5;
   --card: #fcfaf5;
   --panel: #fbf1e9;
@@ -46,6 +47,7 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   --bg: #0f1116;
+  --bg-scrim: rgba(15, 17, 22, 0.55);
   --surface: #171a21;
   --card: #171a21;
   --panel: #1d1c20;
@@ -104,6 +106,24 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Cosmic dawn over the misty mountains, painted behind the whole app;
+   a themed scrim keeps text readable in both light and dark themes. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: url('./assets/cosmic-dawn.jpg') center / cover no-repeat fixed;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-scrim);
 }
 
 .boot {
