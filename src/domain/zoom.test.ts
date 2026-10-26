@@ -75,10 +75,11 @@ describe('viewLayout', () => {
     expect(clamped.rows).toBe(10)
   })
 
-  it('year view is a 13×4 window for the chosen age', () => {
+  it('year view is a 52×7 day heat-map window for the chosen age', () => {
     const layout = viewLayout('year', 80, 0, 34)
-    expect(layout.rows).toBe(4)
+    expect(layout.rows).toBe(7)
     expect(layout.cols).toBe(YEAR_COLS)
+    expect(layout.cols * layout.rows).toBe(364) // one dot per day, 52×7
     expect(layout.weekOffset).toBe(34 * WEEKS_PER_YEAR)
   })
 })

@@ -1,0 +1,348 @@
+/**
+ * Life-grid layout solver.
+ *
+ * One pure function chooses how ALL weeks of the estimated life fit inside the
+ * frosted panel, and the same descriptor drives drawing, hit-testing, tooltips
+ * and labels — so they can never disagree. Candidate layouts, in order:
+ *
+ *   1. CLASSIC — the traditional 52 columns × N year-rows, only when the
+ *      height already allows a pitch of at least `minPitch` (6px).
+ *   2. YEAR BLOCKS — each year is a block of 13 columns × 4 rows (one row per
+ *      quarter: a row inside a block is 13 weeks). Blocks flow left→right and
+ *      wrap, with a ~1.3 × pitch gap between blocks and a subtle extra gap on
+ *      decade boundaries so the eye can count the years.
+ *   3. If nothing fits at `minPitch`, sweep again at the hard pitch (4px) and
+ *      shrink the dot radius with it (radius = pitch × 0.34 — dots always keep
+ *      68% of the cell, never touching, always circles).
+ *   4. Terminal squeeze: below 4px the whole life cannot physically fit even
+ *      at the smallest layout, so use the best achievable pitch rather than
+ *      ever clipping a week — seeing the whole life wins over the floor.
+ *
+ * All coordinates are plot-local: the caller adds the label gutter and
+ * top/bottom paddings.
+ */
+
+export type GridMode = 'classic' | 'blocks'
+
+export interface GridSolution {
+  mode: GridMode
+  /** Cell pitch: centre-to-centre distance of adjacent dots (px, ≥ hard 0.8). */
+  pitch: number
+  /** Dot radius = pitch × 0.34 (dots at 68% of pitch, never touching). */
+  radius: number
+  /** Total week cells to place (the last block/row may be partial). */
+  totalWeeks: number
+  /** Year-blocks per flow-row (blocks mode only; 1 in classic). */
+  blocksPerRow: number
+  /** Width of one year block = 13 × pitch (px). */
+  blockWidth: number
+  /** Height of one year block = 4 × pitch (px). */
+  blockHeight: number
+  /** Gap between adjacent blocks horizontally (px). */
+  gapX: number
+  /** Extra gap after every 10th block — the decade boundary (px). */
+  decadeGapX: number
+  /** Vertical gap between flow-rows of blocks (px). */
+  gapY: number
+  /** Number of year blocks = ceil(totalWeeks / 52). */
+  blocks: number
+  /** Weeks per year block: always 52. */
+  weeksPerBlock: number
+}
+
+export interface SolverOptions {
+  /** Width of the plot area (px), excluding the label gutter. */
+  width: number
+  /** Height of the plot area (px). */
+  height: number
+  /** Every week that must be visible. */
+  totalWeeks: number
+  /** Preferred readable pitch (default 6). */
+  minPitch?: number
+  /** Zoom cap for the whole-life view (default 12). */
+  maxPitch?: number
+  /** Hard floor pitch before the terminal squeeze (default 4). */
+  hardPitch?: number
+}
+
+const WEEKS_PER_YEAR = 52
+const WEEKS_PER_QUARTER = 13
+const BLOCK_ROWS = 4
+const DOT_RATIO = 0.34
+
+interface Pt {
+  x: number
+  y: number
+}
+
+/**
+ * CLASSIC: 52 cols × N year-rows with a soft extra gap after each completed
+ * decade of rows. Returns Infinity when the height cannot host it.
+ */
+function classicPitch(width: number, height: number, totalWeeks: number, floor: number): number {
+  if (totalWeeks <= 0) return Infinity
+  const years = Math.ceil(totalWeeks / WEEKS_PER_YEAR)
+  const cw = width / WEEKS_PER_YEAR
+  const ch = height / (years + 0.6 * Math.floor(years / 10))
+  const p = Math.min(cw, ch)
+  return p >= floor ? p : Infinity
+}
+
+/**
+ * YEAR BLOCKS at a fixed blocks-per-row. Blocks flow left→right; the decade
+ * extra-gap appears after every 10th block. Returns a pitch when ≥ floor.
+ */
+function blocksPitchFor(
+  width: number,
+  height: number,
+  years: number,
+  perRow: number,
+  floor: number,
+): number {
+  if (perRow < 1 || years < 1) return Infinity
+  const gap = 1.3
+  const decadeGap = 0.6
+  // Widest flow-row width: base gaps + the decade boundaries it can contain.
+  const widthFactor =
+    perRow * WEEKS_PER_QUARTER + (perRow - 1) * gap + Math.floor(perRow / 10) * decadeGap
+  const rowsNeeded = Math.ceil(years / perRow)
+  const heightFactor = rowsNeeded * BLOCK_ROWS + (rowsNeeded - 1) * gap
+  const p = Math.min(width / widthFactor, height / heightFactor)
+  return p >= floor ? p : Infinity
+}
+
+/** Shared descriptor builder. */
+function describe(mode: GridMode, pitch: number, blocksPerRow: number, totalWeeks: number): GridSolution {
+  return {
+    mode,
+    pitch,
+    radius: Math.max(pitch * DOT_RATIO, 0.28),
+    totalWeeks,
+    blocksPerRow,
+    blockWidth: WEEKS_PER_QUARTER * pitch,
+    blockHeight: BLOCK_ROWS * pitch,
+    gapX: 1.3 * pitch,
+    decadeGapX: 0.6 * pitch,
+    gapY: 1.3 * pitch,
+    blocks: Math.max(Math.ceil(totalWeeks / WEEKS_PER_YEAR), 1),
+    weeksPerBlock: WEEKS_PER_YEAR,
+  }
+}
+
+/**
+ * The single entry point. Chooses the layout with the largest pitch that keeps
+ * every one of `totalWeeks` dots inside the plot.
+ */
+export function solveLayout(opts: SolverOptions): GridSolution {
+  const { width, height, totalWeeks, minPitch = 6, maxPitch = 12, hardPitch = 4 } = opts
+  if (totalWeeks <= 0) return describe('classic', minPitch, 1, totalWeeks)
+  const years = Math.ceil(totalWeeks / WEEKS_PER_YEAR)
+
+  // 1. CLASSIC at a readable pitch.
+  const pClassic = classicPitch(width, height, totalWeeks, minPitch)
+  if (Number.isFinite(pClassic)) return describe('classic', Math.min(pClassic, maxPitch), 1, totalWeeks)
+
+  // 2. YEAR BLOCKS: the pitch along blocks-per-row is unimodal (width tightens
+  //    as rows fill; height tightens as they stack), so sweep everything.
+  let best = -1
+  let bestPerRow = 1
+  for (let perRow = 1; perRow <= years; perRow++) {
+    const p = blocksPitchFor(width, height, years, perRow, minPitch)
+    if (Number.isFinite(p) && p > best) {
+      best = p
+      bestPerRow = perRow
+    }
+  }
+  if (best >= minPitch) return describe('blocks', Math.min(best, maxPitch), bestPerRow, totalWeeks)
+
+  // 3. Hard floor: same sweep at 4px plus a classic re-check.
+  const pClassicHard = classicPitch(width, height, totalWeeks, hardPitch)
+  let fallback = pClassicHard
+  let fallbackMode: GridMode = 'classic'
+  let fallbackPerRow = 1
+  for (let perRow = 1; perRow <= years; perRow++) {
+    const p = blocksPitchFor(width, height, years, perRow, hardPitch)
+    if (Number.isFinite(p) && p > fallback) {
+      fallback = p
+      fallbackMode = 'blocks'
+      fallbackPerRow = perRow
+    }
+  }
+  if (Number.isFinite(fallback)) {
+    return describe(fallbackMode, Math.max(fallback, hardPitch), fallbackPerRow, totalWeeks)
+  }
+
+  // 4. Terminal squeeze: show all weeks at the best achievable pitch.
+  let squeezed = pClassicHard === Infinity ? classicPitch(width, height, totalWeeks, 0) : pClassicHard
+  let squeezedPerRow = 0 // 0 marks classic
+  for (let perRow = 1; perRow <= years; perRow++) {
+    const p = blocksPitchFor(width, height, years, perRow, 0)
+    if (p > squeezed) {
+      squeezed = p
+      squeezedPerRow = perRow
+    }
+  }
+  const tiny = Math.max(squeezed, 0.8)
+  if (squeezedPerRow === 0) return describe('classic', tiny, 1, totalWeeks)
+  return describe('blocks', tiny, squeezedPerRow, totalWeeks)
+}
+
+/* ------------------------------------------------------------------ */
+/* Mapping: week index ↔ dot centre (shared by draw + hit test)        */
+/* ------------------------------------------------------------------ */
+
+function blockOriginX(sol: GridSolution, block: number): number {
+  const perRow = Math.max(sol.blocksPerRow, 1)
+  const col = block % perRow
+  // Previous blocks take their width; gaps and decade extras sit between.
+  return col * (sol.blockWidth + sol.gapX) + Math.floor(col / 10) * sol.decadeGapX
+}
+
+function blockOriginY(sol: GridSolution, block: number): number {
+  const perRow = Math.max(sol.blocksPerRow, 1)
+  const row = Math.floor(block / perRow)
+  return row * (sol.blockHeight + sol.gapY)
+}
+
+/** Height the layout needs (plot-local). */
+export function solutionHeight(sol: GridSolution): number {
+  if (sol.mode === 'classic') {
+    const years = Math.ceil(sol.totalWeeks / WEEKS_PER_YEAR)
+    return years * sol.pitch + Math.floor(years / 10) * sol.decadeGapX
+  }
+  const rows = Math.ceil(sol.blocks / Math.max(sol.blocksPerRow, 1))
+  return rows * sol.blockHeight + Math.max(rows - 1, 0) * sol.gapY
+}
+
+/** Width of the widest flow-row (plot-local). */
+export function solutionWidth(sol: GridSolution): number {
+  if (sol.mode === 'classic') return WEEKS_PER_YEAR * sol.pitch
+  const perRow = Math.max(sol.blocksPerRow, 1)
+  const widest = Math.min(perRow, sol.blocks)
+  return (widest - 1) * sol.gapX + Math.floor((widest - 1) / 10) * sol.decadeGapX + widest * sol.blockWidth
+}
+
+/**
+ * Dot centre of a week, plot-local. Null when the week is not a real cell
+ * (beyond the final partial block).
+ */
+export function dotCenter(sol: GridSolution, week: number): Pt | null {
+  if (week < 0 || week >= sol.totalWeeks) return null
+  if (sol.mode === 'classic') {
+    const row = Math.floor(week / WEEKS_PER_YEAR)
+    const col = week % WEEKS_PER_YEAR
+    return {
+      x: col * sol.pitch + sol.pitch / 2,
+      y: row * sol.pitch + Math.floor(row / 10) * sol.decadeGapX + sol.pitch / 2,
+    }
+  }
+  const year = Math.floor(week / WEEKS_PER_YEAR)
+  const local = week - year * WEEKS_PER_YEAR
+  const quarter = Math.floor(local / WEEKS_PER_QUARTER)
+  const weekInQuarter = local % WEEKS_PER_QUARTER
+  return {
+    x: blockOriginX(sol, year) + weekInQuarter * sol.pitch + sol.pitch / 2,
+    y: blockOriginY(sol, year) + quarter * sol.pitch + sol.pitch / 2,
+  }
+}
+
+/**
+ * Inverse mapping: plot-local point → week index, gap-aware. Hovering in a
+ * gap between blocks or block-rows finds nothing. Exact inverse of
+ * `dotCenter`: every dot centre maps back to its own week.
+ */
+export function weekAt(sol: GridSolution, x: number, y: number): number | null {
+  if (sol.totalWeeks <= 0) return null
+  if (sol.mode === 'classic') {
+    const col = Math.floor(x / sol.pitch)
+    if (col < 0 || col >= WEEKS_PER_YEAR) return null
+    const years = Math.ceil(sol.totalWeeks / WEEKS_PER_YEAR)
+    // Rows come in decade bands of 10 with the soft gap between bands only.
+    let baseY = 0
+    for (let d = 0; d * 10 < years; d++) {
+      const rowsInBand = Math.min(10, years - d * 10)
+      const bandH = rowsInBand * sol.pitch
+      if (y < baseY + bandH) {
+        const k = Math.min(Math.floor((y - baseY) / sol.pitch), rowsInBand - 1)
+        if (k < 0) return null
+        const week = (d * 10 + k) * WEEKS_PER_YEAR + col
+        return week < sol.totalWeeks ? week : null
+      }
+      baseY += bandH + sol.decadeGapX
+    }
+    return null
+  }
+  const rowHeight = sol.blockHeight + sol.gapY
+  const flowRow = Math.floor(y / rowHeight)
+  if (flowRow < 0) return null
+  if (y > rowHeight * flowRow + sol.blockHeight) return null // gap between rows
+  const innerY = y - rowHeight * flowRow
+  if (innerY < 0 || innerY >= sol.blockHeight) return null
+  const quarter = Math.floor(innerY / sol.pitch)
+  // Walk the flow-row's blocks; the decade gap makes origins non-uniform.
+  const perRow = Math.max(sol.blocksPerRow, 1)
+  const first = flowRow * perRow
+  const last = Math.min(first + perRow - 1, sol.blocks - 1)
+  for (let b = first; b <= last; b++) {
+    const originX = blockOriginX(sol, b) - blockOriginX(sol, first)
+    if (x < originX) return null // in the gap before this block
+    if (x < originX + sol.blockWidth) {
+      const col = Math.floor((x - originX) / sol.pitch)
+      if (col < 0 || col >= WEEKS_PER_QUARTER) return null
+      const week = b * WEEKS_PER_YEAR + quarter * WEEKS_PER_QUARTER + col
+      return week < sol.totalWeeks ? week : null
+    }
+  }
+  return null
+}
+
+/* ------------------------------------------------------------------ */
+/* Age labels: every decade, never overlapping another label           */
+/* ------------------------------------------------------------------ */
+
+export interface AxisLabel {
+  age: number
+  text: string
+  /** Plot-local y anchor; drawn right-aligned into the label gutter. */
+  y: number
+  /** Set when the label is drawn centred above its block (plot-local x)
+   *  instead of the gutter — happens when two decade-starts share a row. */
+  inPlotX?: number
+}
+
+export function labelPlan(sol: GridSolution): AxisLabel[] {
+  const out: AxisLabel[] = []
+  const usedY: number[] = []
+  const years = Math.max(Math.ceil(sol.totalWeeks / WEEKS_PER_YEAR), 1)
+  for (let decade = 0; decade * 10 < years; decade++) {
+    const block = decade * 10
+    if (sol.mode === 'blocks' && block >= sol.blocks) break
+    if (sol.mode === 'classic') {
+      const anchor = dotCenter(sol, Math.min(block * WEEKS_PER_YEAR, sol.totalWeeks - 1))
+      if (!anchor) continue
+      if (usedY.some((u) => Math.abs(u - anchor.y) < 14)) continue
+      usedY.push(anchor.y)
+      out.push({ age: block, text: String(block), y: anchor.y })
+      continue
+    }
+    const b = Math.min(block, sol.blocks - 1)
+    const gutterY = blockOriginY(sol, b) + (sol.pitch * (BLOCK_ROWS - 1)) / 2
+    if (usedY.some((u) => Math.abs(u - gutterY) < 14)) {
+      out.push({
+        age: block,
+        text: String(block),
+        y: blockOriginY(sol, b) - 5,
+        inPlotX: blockOriginX(sol, b) + sol.blockWidth / 2,
+      })
+      continue
+    }
+    usedY.push(gutterY)
+    out.push({ age: block, text: String(block), y: gutterY })
+  }
+  return out
+}
+
+/** Caption: "60 years · 3,120 weeks". */
+export function captionText(lifeYears: number, totalWeeks: number): string {
+  return `${lifeYears} years · ${totalWeeks.toLocaleString('en-US')} weeks`
+}

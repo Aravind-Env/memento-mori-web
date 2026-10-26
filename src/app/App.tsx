@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Dashboard } from '../features/dashboard/Dashboard'
-import { WeekDrawer } from '../features/notes/WeekDrawer'
+import { DailyDrawer } from '../features/notes/DailyDrawer'
+import { MigrationGate } from '../features/journal/MigrationGate'
 import { ChaptersPanel } from '../features/chapters/ChaptersPanel'
 import { GoalsPanel } from '../features/goals/GoalsPanel'
 import { InsightsPanel } from '../features/insights/InsightsPanel'
 import { ReviewPanel } from '../features/review/ReviewPanel'
 import { PeoplePanel } from '../features/people/PeoplePanel'
+import { JournalPanel } from '../features/journal/JournalPanel'
 import { Settings } from '../features/settings/Settings'
 import { AppLock } from '../features/settings/AppLock'
 import { Onboarding } from '../features/onboarding/Onboarding'
@@ -20,6 +22,9 @@ import { parseSearch, searchNotes, weekJumps } from '../domain/search'
 import { verifyLockRecord } from '../domain/crypto'
 import { useMidnightRefresh, usePrefersReducedMotion } from '../shared/hooks'
 import { THEME_STORAGE_KEY, useStore } from '../state/store'
+import { repo, useJournal, useJournalBoot } from '../core/useJournal'
+import { migrateWeeklyNotes } from '../core/migrate'
+import { dateKey } from '../domain/daily'
 import type { Note } from '../data/model'
 
 interface Toast {
@@ -45,12 +50,15 @@ export function App() {
   const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated())
   const [today, setToday] = useState(() => new Date())
   const [editingWeek, setEditingWeek] = useState<number | null>(null)
+  const [editingDay, setEditingDay] = useState<string | null>(null)
+  const [migrationDone, setMigrationDone] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [chaptersOpen, setChaptersOpen] = useState(false)
   const [goalsOpen, setGoalsOpen] = useState(false)
   const [insightsOpen, setInsightsOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [peopleOpen, setPeopleOpen] = useState(false)
+  const [journalOpen, setJournalOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
@@ -68,12 +76,45 @@ export function App() {
     return unsub
   }, [hydrated])
 
-  // Apply the resolved theme (respecting the system preference).
+  // QA seeding: ?dob=2000-07-22&name=Aravind&years=80 fills a demo profile
+  // when storage is empty, for screenshots and quick review only. ?zoom=
+  // checks a specific grid level the same way.
+  useEffect(() => {
+    if (!hydrated) return
+    const sp = new URLSearchParams(window.location.search)
+    if (!useStore.getState().profile) {
+      const dobSeed = sp.get('dob')
+      if (dobSeed) {
+        const years = Number(sp.get('years') ?? 80)
+        useStore
+          .getState()
+          .createProfile(
+            dobSeed,
+            Number.isFinite(years) && years > 0 ? years : 80,
+            sp.get('name') ?? '',
+          )
+      }
+    }
+    const zoomSeed = sp.get('zoom')
+    if (zoomSeed === 'life' || zoomSeed === 'decade' || zoomSeed === 'year') {
+      useStore.getState().setZoom(zoomSeed)
+    }
+  }, [hydrated])
+
+  // Apply the resolved theme (respecting the system preference). A one-shot
+  // ?theme= query param wins for quick QA of both appearances.
   useEffect(() => {
     const mql = window.matchMedia('(prefers-color-scheme: dark)')
     const apply = () => {
+      const override = new URLSearchParams(window.location.search).get('theme')
       const resolved =
-        settings.theme === 'system' ? (mql.matches ? 'dark' : 'light') : settings.theme
+        override === 'dark' || override === 'light'
+          ? override
+          : settings.theme === 'system'
+            ? mql.matches
+              ? 'dark'
+              : 'light'
+            : settings.theme
       document.documentElement.dataset.theme = resolved
       setResolvedTheme(resolved)
       try {
@@ -94,6 +135,38 @@ export function App() {
     const d = parseISODate(profile.dob)
     return Number.isNaN(d.getTime()) ? null : d
   }, [profile])
+
+  // Daily-journal repository: open IndexedDB, decide whether the one-time
+  // weekly→daily migration is still pending.
+  const boot = useJournalBoot(dob)
+
+  // Live journal views for the dashboard paint — weekID roll-ups and day
+  // metadata feed the grid dots and the year heat-map.
+  const { version: journalVersion } = useJournal()
+  const weekInfo = useMemo(() => {
+    void journalVersion
+    const out = new Map<number, { days: number; lastDate: string }>()
+    for (const [weekIndex, w] of repo.getWeekMap()) {
+      if (w.daysWritten > 0) out.set(weekIndex, { days: w.daysWritten, lastDate: w.lastDate })
+    }
+    return out
+  }, [journalVersion])
+  const dayMeta = useMemo(() => {
+    void journalVersion
+    const out = new Map<string, { mood?: number; words: number; title?: string; excerpt: string; goodThing?: string }>()
+    for (const [key, m] of repo.getMetaMap()) {
+      if (m.words > 0 || m.title) {
+        out.set(key, {
+          mood: m.mood,
+          words: m.words,
+          title: m.title,
+          excerpt: m.excerpt,
+          goodThing: m.goodThing,
+        })
+      }
+    }
+    return out
+  }, [journalVersion])
 
   const stats = useMemo(
     () => (dob && profile ? getLifeStats(dob, profile.lifeYears, today, profile.leapRule) : null),
@@ -154,6 +227,15 @@ export function App() {
 
   const quote = useMemo(() => getDailyQuote(today), [today])
 
+  // With nothing to carry over the migration runs silently; with notes the
+  // gate UI offers the backup download first.
+  useEffect(() => {
+    if (!dob || !boot.ready || migrationDone || !boot.needsMigration) return
+    if (notesByWeek.size === 0) {
+      void migrateWeeklyNotes(repo, dob, []).then(() => setMigrationDone(true))
+    }
+  }, [dob, boot.ready, boot.needsMigration, migrationDone, notesByWeek])
+
   // Command palette search: computed in one linear pass, kept out of the way
   // entirely while the palette is closed.
   const search = useMemo(() => {
@@ -171,6 +253,12 @@ export function App() {
     for (const r of search.results.slice(0, 400)) set.add(r.note.weekIndex)
     return set
   }, [searchOpen, search])
+
+  const journalStreak = useMemo(
+    () => repo.streak(new Date()),
+    // recompute when the journal bumps or the clock rolls over midnight
+    [journalVersion, today],
+  )
 
   const yourRemainingYears = useMemo(
     () =>
@@ -190,8 +278,16 @@ export function App() {
   }, [])
 
   const openWeek = useCallback((week: number) => {
+    setEditingDay(null)
     setEditingWeek(week)
   }, [])
+
+  const openDay = useCallback((date: string) => {
+    setEditingWeek(null)
+    setEditingDay(date)
+  }, [])
+
+  const todayKey = useMemo(() => dateKey(today), [today])
 
   const openFromSearch = useCallback(
     (week: number) => {
@@ -219,12 +315,14 @@ export function App() {
           target.isContentEditable)
       if (e.key === 'Escape') {
         setEditingWeek(null)
+        setEditingDay(null)
         setSettingsOpen(false)
         setChaptersOpen(false)
         setGoalsOpen(false)
         setInsightsOpen(false)
         setReviewOpen(false)
         setPeopleOpen(false)
+        setJournalOpen(false)
         setSearchOpen(false)
         return
       }
@@ -235,12 +333,14 @@ export function App() {
       }
       const overlayOpen =
         editingWeek !== null ||
+        editingDay !== null ||
         settingsOpen ||
         chaptersOpen ||
         goalsOpen ||
         insightsOpen ||
         reviewOpen ||
-        peopleOpen
+        peopleOpen ||
+        journalOpen
       if (
         !typing &&
         !overlayOpen &&
@@ -251,10 +351,13 @@ export function App() {
       ) {
         if (e.key === 'n' || e.key === 'N') {
           e.preventDefault()
-          openWeek(stats.weeksLived)
+          openDay(dateKey(today))
         } else if (e.key === 'z' || e.key === 'Z') {
           e.preventDefault()
           setZoom(nextZoom(settings.zoom))
+        } else if (e.key === 'j' || e.key === 'J') {
+          e.preventDefault()
+          setJournalOpen(true)
         }
       }
     }
@@ -262,6 +365,8 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [
     openWeek,
+    openDay,
+    today,
     stats,
     editingWeek,
     settingsOpen,
@@ -270,6 +375,7 @@ export function App() {
     insightsOpen,
     reviewOpen,
     peopleOpen,
+    journalOpen,
     settings.zoom,
     setZoom,
   ])
@@ -298,59 +404,106 @@ export function App() {
 
   return (
     <div className="mm-page">
-      <div className="mm-controls">
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={toggleTheme}
-          aria-label="Toggle light and dark theme"
-          title="Toggle theme"
-        >
-          ◐
-        </button>
-        <button
-          type="button"
-          className="btn btn--sm"
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Open settings"
-        >
-          Settings
-        </button>
+      <div className="mm-shell">
+        <header className="mm-topbar">
+          <p className="mm-eyebrow">Your life in weeks</p>
+          <div className="mm-topbar__cluster">
+            <button
+              type="button"
+              className="mm-theme-toggle"
+              onClick={toggleTheme}
+              aria-label="Toggle light and dark theme"
+              title="Toggle theme"
+            >
+              <svg className="mm-theme-toggle__sun" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4.2" />
+                <path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M5.2 18.8l1.7-1.7M17.1 6.9l1.7-1.7" />
+              </svg>
+              <svg className="mm-theme-toggle__moon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20.6 13.4A8.5 8.5 0 1 1 10.6 3.4a7 7 0 0 0 10 10z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="mm-settings-pill"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Open settings"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="3.2" />
+                <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.09 1.64V21a2 2 0 1 1-4 0v-.09a1.8 1.8 0 0 0-1.16-1.64 1.8 1.8 0 0 0-1.98.36l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.64-1.09H3a2 2 0 1 1 0-4h.09a1.8 1.8 0 0 0 1.64-1.16 1.8 1.8 0 0 0-.36-1.98l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.8 1.8 0 0 0 1.98.36h.09a1.8 1.8 0 0 0 1.09-1.64V3a2 2 0 1 1 4 0v.09a1.8 1.8 0 0 0 1.09 1.64 1.8 1.8 0 0 0 1.98-.36l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.8 1.8 0 0 0-.36 1.98v.09a1.8 1.8 0 0 0 1.64 1.09H21a2 2 0 1 1 0 4h-.09a1.8 1.8 0 0 0-1.51 1.67z" />
+              </svg>
+              Settings
+            </button>
+          </div>
+        </header>
+
+        <Dashboard
+          stats={stats}
+          lifeYears={profile.lifeYears}
+          name={profile.name}
+          dob={profile.dob}
+          notesByWeek={notesByWeek}
+          chapters={profileChapters}
+          goals={profileGoals}
+          reduceMotion={reduced}
+          themeKey={resolvedTheme}
+          gentleMode={settings.gentleMode}
+          quote={quote}
+          zoom={settings.zoom}
+          onZoomChange={setZoom}
+          reviewDue={due}
+          searchHighlight={searchHighlight}
+          onSelectWeek={openWeek}
+          onOpenDay={openDay}
+          weekInfo={weekInfo}
+          dayMeta={dayMeta}
+          streak={journalStreak}
+          onOpenChapters={() => setChaptersOpen(true)}
+          onOpenGoals={() => setGoalsOpen(true)}
+          onOpenInsights={() => setInsightsOpen(true)}
+          onOpenReview={() => setReviewOpen(true)}
+          onOpenPeople={() => setPeopleOpen(true)}
+          onOpenJournal={() => setJournalOpen(true)}
+          peopleCount={people.length}
+        />
       </div>
 
-      <Dashboard
-        stats={stats}
-        lifeYears={profile.lifeYears}
-        name={profile.name}
-        dob={profile.dob}
-        notesByWeek={notesByWeek}
-        chapters={profileChapters}
-        goals={profileGoals}
-        reduceMotion={reduced}
-        themeKey={resolvedTheme}
-        gentleMode={settings.gentleMode}
-        quote={quote}
-        zoom={settings.zoom}
-        onZoomChange={setZoom}
-        reviewDue={due}
-        searchHighlight={searchHighlight}
-        onSelectWeek={openWeek}
-        onOpenChapters={() => setChaptersOpen(true)}
-        onOpenGoals={() => setGoalsOpen(true)}
-        onOpenInsights={() => setInsightsOpen(true)}
-        onOpenReview={() => setReviewOpen(true)}
-        onOpenPeople={() => setPeopleOpen(true)}
-        peopleCount={people.length}
-      />
-
-      {editingWeek !== null && (
-        <WeekDrawer
-          key={editingWeek}
-          weekIndex={editingWeek}
+      {boot.ready && boot.needsMigration && !migrationDone && dob && (
+        <MigrationGate
           dob={dob}
-          currentWeek={stats.weeksLived}
+          notes={notes}
+          onDone={() => {
+            setMigrationDone(true)
+            openDay(todayKey)
+          }}
+        />
+      )}
+
+      {editingDay !== null && dob && (
+        <DailyDrawer
+          key={editingDay}
+          view="day"
+          date={editingDay}
+          dob={dob}
+          today={today}
+          onClose={() => setEditingDay(null)}
+          onToast={showToast}
+          onOpenDay={openDay}
+          onOpenWeek={openWeek}
+        />
+      )}
+
+      {editingWeek !== null && dob && editingDay === null && (
+        <DailyDrawer
+          view="week"
+          date={todayKey}
+          dob={dob}
+          today={today}
           onClose={() => setEditingWeek(null)}
           onToast={showToast}
+          onOpenDay={openDay}
+          onOpenWeek={openWeek}
         />
       )}
 
@@ -378,7 +531,6 @@ export function App() {
 
       {insightsOpen && (
         <InsightsPanel
-          notes={Array.from(notesByWeek.values())}
           weeksLived={stats.weeksLived}
           onClose={() => setInsightsOpen(false)}
         />
@@ -402,6 +554,18 @@ export function App() {
           gentleMode={settings.gentleMode}
           onClose={() => setPeopleOpen(false)}
           onToast={showToast}
+        />
+      )}
+
+      {journalOpen && dob && (
+        <JournalPanel
+          dob={dob}
+          today={today}
+          onClose={() => setJournalOpen(false)}
+          onSelectDay={(d) => {
+            setJournalOpen(false)
+            openDay(d)
+          }}
         />
       )}
 

@@ -1,31 +1,29 @@
 :root {
-  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  --font-serif: 'Fraunces', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
   --font-sans: 'Figtree', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   color-scheme: light;
-  --bg: #f6f3ec;
-  --bg-scrim: rgba(246, 243, 236, 0.88);
-  --surface: #fcfaf5;
-  --card: #fcfaf5;
-  --panel: #fbf1e9;
-  --line: #ebe5da;
+  /* Editorial palette: warm cream page, raised paper surfaces, hairline ink. */
+  --bg: #fbf8f2;
+  --bg-deep: #f3edE1;
+  --bg-scrim: rgba(251, 248, 242, 0.72);
+  --surface: #fffdf9;
+  --card: #fffdf9;
+  --panel: #fdf4ea;
+  --line: #e9e3d8;
+  --border: #e9e3d8;
   --text: #1f2430;
   --ink: #1f2430;
-  --muted: #8b877f;
-  --border: #ebe5da;
+  --muted: #7a766e;
   --lived: #1f2430;
-  --future: #d6d2ca;
-  --ahead: #d6d2ca;
+  --future: #d8d2c6;
+  --ahead: #d8d2c6;
   --accent: #ee6c4d;
-  --accent2: #f6a46a;
-  --accent-contrast: #ffffff;
-  --track: #e6e2da;
-  --m1: #c9c4be;
-  --m2: #b4afaa;
-  --m3: #9b9893;
-  --hill: #3b3d43;
-  --sun: #fde7d0;
-  --sky: #f8b98a;
+  --accent2: #f4915f;
+  --accent-ink: #b34527;
+  --accent-contrast: #241a12;
+  --accent-wash: rgba(238, 108, 77, 0.12);
+  --track: #efe9dc;
   /* Chapter palette (light): calm mid-tones, distinct from --accent. */
   --ch-teal: #22968e;
   --ch-blue: #4079c4;
@@ -41,31 +39,35 @@
   --mood3: #c3a95f;
   --mood4: #8faa6d;
   --mood5: #4f9e8c;
-  --shadow: 0 20px 60px rgba(60, 40, 20, 0.08);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(60, 40, 20, 0.06);
+  /* Radii + shared geometry. */
+  --r-sm: 12px;
+  --r-md: 20px;
+  --r-lg: 28px;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0f1116;
-  --bg-scrim: rgba(15, 17, 22, 0.55);
-  --surface: #171a21;
-  --card: #171a21;
-  --panel: #1d1c20;
+  --bg: #101217;
+  --bg-deep: #0b0d11;
+  --bg-scrim: rgba(16, 18, 23, 0.6);
+  --surface: #14161b;
+  --card: #14161b;
+  --panel: #1b1e25;
   --line: #2a2d36;
-  --text: #ecebe6;
-  --ink: #ecebe6;
-  --muted: #9a978f;
   --border: #2a2d36;
-  --lived: #ecebe6;
-  --future: #363a45;
-  --ahead: #363a45;
+  --text: #eceae4;
+  --ink: #eceae4;
+  --muted: #9a978f;
+  --lived: #eceae4;
+  --future: #4a4f5e;
+  --ahead: #4a4f5e;
   --accent: #ee6c4d;
-  --accent2: #f6a46a;
-  --accent-contrast: #1b1b1f;
-  --track: #2b2e38;
-  --m1: #3a3d47;
-  --m2: #30333c;
-  --m3: #262830;
+  --accent2: #f4915f;
+  --accent-ink: #f4915f;
+  --accent-contrast: #17130f;
+  --accent-wash: rgba(238, 108, 77, 0.16);
+  --track: #262a33;
   /* Chapter palette (dark): lightened for the dark canvas. */
   --ch-teal: #45c2b4;
   --ch-blue: #7fa6e8;
@@ -80,10 +82,7 @@
   --mood3: #b9a96a;
   --mood4: #8ba877;
   --mood5: #5fae9e;
-  --hill: #0d0e12;
-  --sun: #6d4a38;
-  --sky: #c0744a;
-  --shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 12px 32px rgba(0, 0, 0, 0.32);
 }
 
 *,
@@ -92,10 +91,24 @@
   box-sizing: border-box;
 }
 
+/* Static desktop page: the app fills the viewport exactly and never scrolls.
+   Below 768px the layout cannot physically fit, so normal vertical page
+   scrolling is restored (the only scroll exception). */
 html,
 body {
   margin: 0;
-  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+@media (max-width: 767px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+    overscroll-behavior: auto;
+  }
 }
 
 body {
@@ -106,29 +119,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-
-/* Cosmic dawn over the misty mountains, painted behind the whole app;
-   a themed scrim keeps text readable in both light and dark themes. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  background: url('./assets/cosmic-dawn.jpg') center / cover no-repeat fixed;
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: var(--bg-scrim);
-}
-
-.boot {
-  min-height: 100vh;
-  background: var(--bg);
+  font-variant-numeric: tabular-nums;
 }
 
 h1,
@@ -142,6 +133,11 @@ blockquote {
 
 button {
   font-family: inherit;
+}
+
+.boot {
+  min-height: 100vh;
+  background: var(--bg);
 }
 
 :focus-visible {
@@ -504,6 +500,9 @@ kbd {
   max-width: 1400px;
   margin: 0 auto;
   padding: clamp(1rem, 3.5vh, 2.2rem) clamp(1rem, 4vw, 3rem);
+  /* The page body no longer scrolls; overlays must own their overflow. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .onboarding__intro,
 .onboarding__form {

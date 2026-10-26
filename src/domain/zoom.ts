@@ -9,10 +9,10 @@ export type ZoomLevel = 'life' | 'decade' | 'year'
 
 /** Ages per row band in the decade view. */
 export const DECADE_ROWS = 10
-/** Rows in the year view: 13 weeks × 4 rows = 52 weeks. */
-export const YEAR_ROWS = 4
-/** Columns of weeks in the year view (13 weeks per quarter). */
-export const YEAR_COLS = 13
+/** Rows in the year view: one per weekday — 52 weeks × 7 days of dots. */
+export const YEAR_ROWS = 7
+/** Columns of weeks in the year view. */
+export const YEAR_COLS = 52
 
 /** Cycles life → decade → year → life, for the Z key. */
 export function nextZoom(zoom: ZoomLevel): ZoomLevel {
@@ -63,6 +63,9 @@ export function viewLayout(
   const rows = Math.max(totalRows, 1)
   if (zoom === 'year' && totalRows > 0) {
     const y = clampYear(year, totalRows)
+    // The year view is day-granular: 52 columns × 7 weekday rows, one dot
+    // per day of the age-year. weekOffset anchors the leftmost column's
+    // week; the canvas translates (col,row) → absolute day index.
     return { rows: YEAR_ROWS, cols: YEAR_COLS, weekOffset: y * WEEKS_PER_YEAR }
   }
   if (zoom === 'decade') {

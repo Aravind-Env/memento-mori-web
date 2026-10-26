@@ -1,0 +1,210 @@
+/* Journal reading view — a wider drawer that reads like a book feed. */
+
+.drawer--journal {
+  width: min(640px, 100%);
+  gap: 0.9rem;
+}
+
+.journal__summary {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.journal__searchwrap {
+  position: relative;
+}
+.journal__clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+.journal__clear:hover {
+  color: var(--ink);
+}
+
+.journal__scroll {
+  flex: 1;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+/* Virtualized feed cells (positioned inside a fixed-height spacer). */
+.journal-feed__cell {
+  position: absolute;
+  overflow: hidden;
+}
+.journal-feed__cell .journal-entry {
+  height: 100%;
+}
+.journal-feed__cell .journal-year__title {
+  /* vertically centered within the 48px cell */
+  line-height: 48px;
+  margin: 0;
+  font-size: 1.2rem;
+}
+.journal-feed__cell .journal-month__label {
+  line-height: 36px;
+}
+
+.journal__count {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+/* Year → month → entry */
+.journal-year__title {
+  margin: 0;
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+  font-weight: 500;
+  font-size: 1.35rem;
+  letter-spacing: 0.01em;
+}
+.journal-year + .journal-year {
+  margin-top: 0.4rem;
+}
+.journal-month {
+  margin-top: 0.55rem;
+}
+.journal-month__label {
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.journal-month__n {
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
+  letter-spacing: 0;
+}
+
+.journal-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.4rem;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.journal-entry:last-child {
+  border-bottom: 0;
+}
+.journal-entry:hover {
+  background: var(--accent-wash);
+  border-radius: 10px;
+}
+.journal-entry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 10px;
+}
+
+.journal-entry__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+}
+.journal-entry__date {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.journal-entry__age {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.journal-entry__pin {
+  color: var(--accent);
+}
+.journal-entry__mood {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.journal-entry__mood i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+}
+.journal-entry__mood i.on {
+  background: var(--accent);
+}
+.journal-entry__tags {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.journal-entry__tag {
+  font-size: 0.72rem;
+  color: var(--accent-ink);
+  background: var(--accent-wash);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.journal-entry__text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Empty / no-match states */
+.journal__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  padding: 1rem;
+}
+.journal__empty-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.journal__empty-lead {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  max-width: 42ch;
+  line-height: 1.55;
+}
+
+.journal__foot {
+  align-items: center;
+}
+.journal__hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
