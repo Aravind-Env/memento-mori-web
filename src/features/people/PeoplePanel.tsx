@@ -5,7 +5,7 @@ import { calculateSharedLife } from '../../domain/sharedLife'
 import { useStore } from '../../state/store'
 import './people.css'
 
-const KINDS = ['parent', 'partner', 'child', 'sibling', 'friend', 'other', 'others'] as const
+const KINDS = ['parent', 'partner', 'child', 'sibling', 'friend', 'others'] as const
 
 export interface PeoplePanelProps {
   people: Relationship[]
