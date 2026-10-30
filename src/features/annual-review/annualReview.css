@@ -175,3 +175,15 @@
   align-items: center;
   gap: 8px;
 }
+
+.review__empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-muted, #666);
+}
+
+.review__empty__message {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}

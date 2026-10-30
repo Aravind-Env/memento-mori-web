@@ -185,7 +185,9 @@ export interface VaultRecord {
 /**
  * A person whose time you share — a parent, a partner, a friend. Visits per
  * year turn both remaining lifespans into "about N more times". The birth
- * date is optional; without it the count stays honest and unknown.
+ * date is optional; without it the count stays honest and unknown. Each
+ * person carries their own expected lifespan estimate, independent of the
+ * user's — shared time uses the earlier of the two projected end dates.
  */
 export interface Relationship {
   id: string
@@ -195,6 +197,11 @@ export interface Relationship {
   visitsPerYear: number
   /** `YYYY-MM-DD`, optional. */
   dob?: string
+  /** Person-specific expected lifespan in years. Defaults to the user's
+   *  estimate when absent, but is editable per person. */
+  expectedLifespan?: number
+  /** Optional personal notes about this person. */
+  notes?: string
 }
 
 /**
@@ -221,7 +228,7 @@ export function migrateData(raw: unknown, version: number): PersistedData {
       goals: version < 3 ? [] : sanitizeGoals(data.goals),
       settings,
       vault: version < 6 ? null : sanitizeVault(data.vault),
-      people: version < 7 ? [] : sanitizePeople(data.people),
+      people: version < 7 ? [] : sanitizePeople(data.people, (data.profile as Profile | undefined)?.lifeYears),
       habits: version < 9 ? [] : sanitizeHabits(data.habits),
       annualReviews: version < 9 ? [] : sanitizeAnnualReviews(data.annualReviews),
     }
@@ -244,7 +251,7 @@ export function sanitizeVault(raw: unknown): VaultRecord | null {
 }
 
 /** Read back a possibly-untrusted list of people and keep only valid rows. */
-export function sanitizePeople(raw: unknown): Relationship[] {
+export function sanitizePeople(raw: unknown, defaultLifespan?: number): Relationship[] {
   if (!Array.isArray(raw)) return []
   const out: Relationship[] = []
   for (const item of raw) {
@@ -267,6 +274,17 @@ export function sanitizePeople(raw: unknown): Relationship[] {
       !Number.isNaN(parseISODate(p.dob).getTime())
     ) {
       person.dob = p.dob
+    }
+    // Expected lifespan: person-specific, defaults to the user's estimate when absent.
+    const life = Math.round(Number(p.expectedLifespan))
+    if (Number.isFinite(life) && life >= 1 && life <= 120) {
+      person.expectedLifespan = life
+    } else if (defaultLifespan !== undefined && defaultLifespan >= 1 && defaultLifespan <= 120) {
+      person.expectedLifespan = defaultLifespan
+    }
+    // Optional personal notes.
+    if (typeof p.notes === 'string' && p.notes.trim().length > 0) {
+      person.notes = p.notes.trim()
     }
     out.push(person)
   }

@@ -16,7 +16,7 @@ import { Settings } from '../features/settings/Settings'
 import { AppLock } from '../features/settings/AppLock'
 import { Onboarding } from '../features/onboarding/Onboarding'
 import { CommandPalette } from '../features/search/CommandPalette'
-import { parseISODate, WEEKS_PER_YEAR } from '../domain/dates'
+import { parseISODate } from '../domain/dates'
 import { getLifeStats } from '../domain/lifeMath'
 import { getDailyQuote } from '../domain/quotes'
 import { nextZoom } from '../domain/zoom'
@@ -264,14 +264,6 @@ export function App() {
     () => repo.streak(new Date()),
     // recompute when the journal bumps or the clock rolls over midnight
     [journalVersion, today],
-  )
-
-  const yourRemainingYears = useMemo(
-    () =>
-      stats
-        ? Math.max((stats.totalCells - stats.weeksLived) / WEEKS_PER_YEAR, 0)
-        : 0,
-    [stats],
   )
 
   const showToast = useCallback((message: string, undo?: () => void) => {
@@ -578,8 +570,8 @@ export function App() {
       {peopleOpen && (
         <PeoplePanel
           people={people}
-          yourRemainingYears={yourRemainingYears}
-          lifeExpectancy={profile.lifeYears}
+          userDob={profile.dob}
+          userLifeYears={profile.lifeYears}
           today={today}
           gentleMode={settings.gentleMode}
           onClose={() => setPeopleOpen(false)}

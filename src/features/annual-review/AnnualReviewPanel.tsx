@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import './annualReview.css'
 import { useStore } from '../../state/store'
@@ -20,24 +20,41 @@ export function AnnualReviewPanel({ onClose }: AnnualReviewPanelProps) {
   const [reflection, setReflection] = useState('')
   const [summary, setSummary] = useState<AnnualSummary | null>(null)
   const [savedYears, setSavedYears] = useState<number[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const entries = repo
-    .liveDates()
-    .map((d) => repo.getMeta(d))
-    .filter((m): m is import('../../core/journal').EntryMeta => Boolean(m))
+  const entries = useMemo(() => {
+    return repo
+      .liveDates()
+      .map((d) => repo.getMeta(d))
+      .filter((m): m is import('../../core/journal').EntryMeta => Boolean(m))
+  }, [repo.version])
 
-  useMemo(() => {
-    if (!profile) return
-    const s = generateAnnualSummary(year, entries, chapters || [], goals || [], new Date(profile.dob))
-    setSummary(s)
+  useEffect(() => {
+    if (!profile) {
+      setSummary(null)
+      setSavedYears([])
+      setReflection('')
+      setLoading(false)
+      return
+    }
 
-    const saved = annualReviews
-      .filter((r) => r.profileId === profile.id)
-      .map((r) => r.year)
-    setSavedYears(saved)
+    setLoading(true)
+    try {
+      const s = generateAnnualSummary(year, entries, chapters || [], goals || [], new Date(profile.dob))
+      setSummary(s)
 
-    const existing = annualReviews.find((r) => r.profileId === profile.id && r.year === year)
-    setReflection(existing?.reflection ?? '')
+      const saved = annualReviews
+        .filter((r) => r.profileId === profile.id)
+        .map((r) => r.year)
+      setSavedYears(saved)
+
+      const existing = annualReviews.find((r) => r.profileId === profile.id && r.year === year)
+      setReflection(existing?.reflection ?? '')
+    } catch {
+      setSummary(null)
+    } finally {
+      setLoading(false)
+    }
   }, [year, entries, chapters, goals, profile, annualReviews])
 
   const saveReview = useCallback(() => {
@@ -47,7 +64,108 @@ export function AnnualReviewPanel({ onClose }: AnnualReviewPanelProps) {
 
   const isSaved = savedYears.includes(year)
 
-  if (!profile || !summary) return null
+  if (loading) {
+    return null
+  }
+
+  if (!profile) return null
+
+  // Empty state: no entries at all for any year
+  const totalAllEntries = entries.length
+  if (totalAllEntries === 0 && !isSaved) {
+    return (
+      <div className="drawer-scrim" onClick={onClose}>
+        <aside
+          className="drawer drawer-annual-review"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Annual Life Review"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <header className="drawer__head">
+            <div>
+              <p className="drawer__eyebrow">Annual Life Review</p>
+              <h2 className="drawer__title">{year}</h2>
+            </div>
+            <div className="drawer__year-nav">
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setYear((y) => y - 1)}
+                disabled={year <= 1900}
+                aria-label="Previous year"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setYear((y) => y + 1)}
+                aria-label="Next year"
+              >
+                ›
+              </button>
+            </div>
+            <button className="icon-btn" onClick={onClose} aria-label="Close review" data-qa="annual-review-close">✕</button>
+          </header>
+
+          <div className="drawer-body" data-qa="annual-review-body">
+            <section className="review__empty">
+              <p className="review__empty__message">
+                No journal entries yet for {year}. Write a few entries and your annual review
+                will appear here automatically.
+              </p>
+            </section>
+
+            <section className="review__section review__section--reflection">
+              <h3 className="review__heading">Your reflection</h3>
+              <textarea
+                className="review__reflection"
+                value={reflection}
+                onChange={(e) => setReflection(e.target.value)}
+                placeholder="What mattered most this year? What would you like to remember?"
+                rows={6}
+              />
+              <div className="review__actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={saveReview}
+                  disabled={!reflection.trim()}
+                >
+                  {isSaved ? 'Update review' : 'Save review'}
+                </button>
+                {isSaved && <span className="review__saved">Saved</span>}
+              </div>
+            </section>
+
+            {savedYears.length > 1 && (
+              <section className="review__section">
+                <h3 className="review__heading">Previous reviews</h3>
+                <div className="review__year-list">
+                  {savedYears
+                    .filter((y) => y !== year)
+                    .sort((a, b) => b - a)
+                    .map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        className="review__year-btn"
+                        onClick={() => setYear(y)}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                </div>
+              </section>
+            )}
+          </div>
+        </aside>
+      </div>
+    )
+  }
+
+  if (!summary) return null
 
   return (
     <div className="drawer-scrim" onClick={onClose}>

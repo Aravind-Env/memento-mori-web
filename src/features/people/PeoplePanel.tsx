@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Relationship } from '../../data/model'
-import { sharedTimeFor, sharedTimeNote } from '../../domain/sharedTime'
+import { calculateSharedLife } from '../../domain/sharedLife'
 import { useStore } from '../../state/store'
 import './people.css'
 
@@ -9,12 +9,12 @@ const KINDS = ['parent', 'partner', 'child', 'sibling', 'friend', 'other'] as co
 
 export interface PeoplePanelProps {
   people: Relationship[]
-  /** The user's remaining estimated years, from their own grid. */
-  yourRemainingYears: number
-  /** Lifespan yardstick in years applied to the other person's estimate. */
-  lifeExpectancy: number
+  /** The user's date of birth as YYYY-MM-DD. */
+  userDob: string
+  /** The user's expected lifespan in years. */
+  userLifeYears: number
   today: Date
-  /** Gentle mode counts nothing — only visits per year. */
+  /** Gentle mode hides estimated meeting counts. */
   gentleMode: boolean
   onClose: () => void
   onToast: (message: string, undo?: () => void) => void
@@ -23,8 +23,8 @@ export interface PeoplePanelProps {
 /** Visits still ahead with the people who make the weeks worth counting. */
 export function PeoplePanel({
   people,
-  yourRemainingYears,
-  lifeExpectancy,
+  userDob,
+  userLifeYears,
   today,
   gentleMode,
   onClose,
@@ -39,6 +39,8 @@ export function PeoplePanel({
   const [kind, setKind] = useState<(typeof KINDS)[number]>('parent')
   const [visits, setVisits] = useState(12)
   const [dob, setDob] = useState('')
+  const [expectedLifespan, setExpectedLifespan] = useState<number | undefined>(userLifeYears)
+  const [notes, setNotes] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const nameRef = useRef<HTMLInputElement>(null)
@@ -53,6 +55,8 @@ export function PeoplePanel({
     setKind((KINDS as readonly string[]).includes(person.kind) ? (person.kind as (typeof KINDS)[number]) : 'other')
     setVisits(person.visitsPerYear)
     setDob(person.dob ?? '')
+    setExpectedLifespan(person.expectedLifespan ?? undefined)
+    setNotes(person.notes ?? '')
     setError('')
     nameRef.current?.focus()
   }
@@ -63,6 +67,8 @@ export function PeoplePanel({
     setKind('parent')
     setVisits(12)
     setDob('')
+    setExpectedLifespan(userLifeYears)
+    setNotes('')
     setError('')
   }
 
@@ -76,11 +82,18 @@ export function PeoplePanel({
       return
     }
     if (editingId) {
-      updatePerson(editingId, { name, kind, visitsPerYear: visits, dob: dob || undefined })
+      updatePerson(editingId, {
+        name,
+        kind,
+        visitsPerYear: visits,
+        dob: dob || undefined,
+        expectedLifespan: expectedLifespan !== undefined ? expectedLifespan : undefined,
+        notes: notes || undefined,
+      })
       cancelEdit()
       return
     }
-    if (addPerson(name, kind, visits, dob || undefined)) {
+    if (addPerson(name, kind, visits, dob || undefined, expectedLifespan, notes || undefined)) {
       cancelEdit()
     }
   }
@@ -89,6 +102,16 @@ export function PeoplePanel({
     const removed = removePerson(person.id)
     if (removed) onToast(`Removed ${removed.name}.`, () => restorePerson(removed))
   }
+
+  // Pre-calculate shared life for each person
+  const peopleWithShared = useMemo(
+    () =>
+      people.map((p) => {
+        const shared = calculateSharedLife(p, userDob, userLifeYears, today)
+        return { person: p, shared }
+      }),
+    [people, userDob, userLifeYears, today],
+  )
 
   return (
     <div className="drawer-scrim" onClick={onClose}>
@@ -116,8 +139,8 @@ export function PeoplePanel({
 
         <p className="people__lead">
           {gentleMode
-            ? 'List the people you see regularly and how often. Counts stay in the quiet of other modes.'
-            : 'How often you see someone, and how many of those visits are likely left — the shorter of your two remaining estimates.'}
+            ? 'List the people you see regularly and how often. Counts stay hidden in gentle mode.'
+            : 'Estimated shared time uses the earlier of your two projected end dates — yours and theirs. Each person has their own lifespan estimate; edit it anytime.'}
         </p>
 
         {people.length === 0 && (
@@ -126,31 +149,44 @@ export function PeoplePanel({
 
         {people.length > 0 && (
           <ul className="people__list">
-            {people.map((p) => {
-              const shared =
-                gentleMode && p.dob
-                  ? { personAge: null, remainingMeetings: null, sharedYears: 0, theirRemainingYears: 0 }
-                  : sharedTimeFor(p, yourRemainingYears, lifeExpectancy, today)
+            {peopleWithShared.map(({ person, shared }) => {
+              const visitsLabel =
+                person.visitsPerYear === 1 ? 'visit/yr' : `${person.visitsPerYear} visits/yr`
               return (
-                <li key={p.id} className="people-row">
+                <li key={person.id} className="people-row">
                   <div className="people-row__body">
-                    <span className="people-row__name">{p.name}</span>
+                    <span className="people-row__name">{person.name}</span>
                     <span className="people-row__meta">
-                      {p.kind} · {p.visitsPerYear} visit{p.visitsPerYear === 1 ? '' : 's'} per year
-                      {p.dob && shared.personAge !== null ? ` · age ${shared.personAge}` : ''}
+                      {person.kind} · {person.visitsPerYear} {visitsLabel}
+                      {person.dob ? ` · age ${shared.personAge}` : ''}
+                      {person.expectedLifespan !== undefined ? ` · est. lifespan ${person.expectedLifespan} yrs` : ''}
                     </span>
                   </div>
-                  {!gentleMode && p.visitsPerYear > 0 ? (
+                  {!gentleMode && person.visitsPerYear > 0 ? (
                     <span className="people-row__count">
-                      {shared.remainingMeetings === null ? (
+                      {shared.isSharedTimePassed ? (
+                        <>
+                          <span className="people-row__passed">
+                            Projected shared window has passed
+                          </span>
+                          <em className="people-row__why">
+                            Actual lifespans are unpredictable — this is an estimate, not a deadline.
+                          </em>
+                        </>
+                      ) : shared.estimatedFutureMeetings === null ? (
                         <>
                           count unknown
                           <em className="people-row__why">add a birth date</em>
                         </>
                       ) : (
                         <>
-                          ~{shared.remainingMeetings.toLocaleString()} visits left
-                          <em className="people-row__why">{sharedTimeNote(shared.personAge)}</em>
+                          ~{shared.estimatedFutureMeetings.toLocaleString()} more {visitsLabel}
+                          <br />
+                          <span className="people-row__meta">
+                            ~{shared.sharedRemainingYears} yrs · {shared.sharedRemainingMonths} mos
+                            {' · '}
+                            est. shared end: {shared.sharedProjectedEnd}
+                          </span>
                         </>
                       )}
                     </span>
@@ -160,16 +196,16 @@ export function PeoplePanel({
                   <button
                     type="button"
                     className="btn btn--sm"
-                    onClick={() => startEdit(p)}
-                    aria-label={`Edit ${p.name}`}
+                    onClick={() => startEdit(person)}
+                    aria-label={`Edit ${person.name}`}
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     className="icon-btn icon-btn--sm"
-                    onClick={() => handleDelete(p)}
-                    aria-label={`Remove ${p.name}`}
+                    onClick={() => handleDelete(person)}
+                    aria-label={`Remove ${person.name}`}
                   >
                     ×
                   </button>
@@ -234,15 +270,51 @@ export function PeoplePanel({
             </label>
           </div>
 
+          <div className="people-form__pair">
+            <label className="field">
+              <span className="field__label">Their birth date (optional)</span>
+              <input
+                type="date"
+                className="field__input"
+                value={dob}
+                aria-label="Their birth date"
+                onChange={(e) => {
+                  setDob(e.target.value)
+                  setError('')
+                }}
+              />
+              <span className="field__hint">Sharpens the shared-time estimate.</span>
+            </label>
+
+            <label className="field">
+              <span className="field__label">Their est. lifespan (years)</span>
+              <input
+                type="number"
+                className="field__input"
+                min={1}
+                max={120}
+                step={1}
+                value={expectedLifespan ?? ''}
+                aria-label="Their expected lifespan"
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  setExpectedLifespan(Number.isFinite(v) && v >= 1 && v <= 120 ? v : undefined)
+                  setError('')
+                }}
+              />
+              <span className="field__hint">Independent of your own estimate — editable anytime.</span>
+            </label>
+          </div>
+
           <label className="field">
-            <span className="field__label">Their birth date (optional — sharpens the count)</span>
-            <input
-              type="date"
-              className="field__input"
-              value={dob}
-              aria-label="Their birth date"
+            <span className="field__label">Notes (optional)</span>
+            <textarea
+              className="field__input field__textarea"
+              value={notes}
+              placeholder="e.g. lives nearby, see them at holidays"
+              rows={2}
               onChange={(e) => {
-                setDob(e.target.value)
+                setNotes(e.target.value)
                 setError('')
               }}
             />
@@ -253,6 +325,12 @@ export function PeoplePanel({
               {error}
             </p>
           ) : null}
+
+          <p className="people__disclaimer">
+            These are estimates based on birth dates and expected lifespans you provide.
+            Actual lifespans and future opportunities to meet are unpredictable. Use this as a
+            gentle reminder to spend meaningful time together — not as a prediction or deadline.
+          </p>
 
           <footer className="drawer__foot">
             {editingId ? (

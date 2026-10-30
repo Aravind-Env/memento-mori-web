@@ -85,3 +85,37 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.6rem;
 }
+
+.people-row__passed {
+  font-size: var(--text-sm, 0.9rem);
+  color: var(--text-1, #262b33);
+  font-weight: 500;
+}
+
+.field__textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 6px 10px;
+  border: 1px solid var(--line, #e2e5ea);
+  border-radius: 0.4rem;
+  background: var(--surface-2, #f7f8fa);
+  color: var(--text-1, #262b33);
+  font-family: inherit;
+  font-size: var(--text-sm, 0.9rem);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.field__hint {
+  font-size: 0.72rem;
+  color: var(--text-2, #5a6472);
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.people__disclaimer {
+  font-size: 0.75rem;
+  color: var(--text-2, #5a6472);
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}

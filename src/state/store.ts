@@ -82,8 +82,10 @@ interface StoreState {
     kind: string,
     visitsPerYear: number,
     dob?: string,
+    expectedLifespan?: number,
+    notes?: string,
   ) => boolean
-  updatePerson: (id: string, patch: Partial<Pick<Relationship, 'name' | 'kind' | 'visitsPerYear' | 'dob'>>) => boolean
+  updatePerson: (id: string, patch: Partial<Pick<Relationship, 'name' | 'kind' | 'visitsPerYear' | 'dob' | 'expectedLifespan' | 'notes'>>) => boolean
   removePerson: (id: string) => Relationship | undefined
   restorePerson: (person: Relationship) => void
 
@@ -307,18 +309,23 @@ export const useStore = create<StoreState>()(
       restoreGoal: (goal) =>
         set((s) => (s.goals.some((g) => g.id === goal.id) ? {} : { goals: [...s.goals, goal] })),
 
-      addPerson: (name, kind, visitsPerYear, dob) => {
+      addPerson: (name, kind, visitsPerYear, dob, expectedLifespan, notes) => {
         const { profile } = get()
         if (!profile) return false
         const clean = name.trim()
         if (!clean) return false
+        if (visitsPerYear < 0 || visitsPerYear > 366) return false
         const person: Relationship = {
           id: createId(),
           profileId: profile.id,
           name: clean,
           kind: kind || 'other',
-          visitsPerYear: Math.min(Math.max(Math.round(visitsPerYear), 0), 366),
+          visitsPerYear: Math.round(visitsPerYear),
           ...(dob ? { dob } : {}),
+          ...(expectedLifespan !== undefined && expectedLifespan >= 1 && expectedLifespan <= 120
+            ? { expectedLifespan }
+            : { expectedLifespan: profile.lifeYears }),
+          ...(notes ? { notes } : {}),
         }
         set((s) => ({ people: [...s.people, person] }))
         return true
@@ -348,6 +355,21 @@ export const useStore = create<StoreState>()(
             if (patch.dob !== undefined) {
               if (patch.dob) next.dob = patch.dob
               else delete next.dob
+            }
+            if (patch.expectedLifespan !== undefined) {
+              const life = Math.round(patch.expectedLifespan)
+              if (Number.isFinite(life) && life >= 1 && life <= 120) {
+                next.expectedLifespan = life
+              } else {
+                delete next.expectedLifespan
+              }
+            }
+            if (patch.notes !== undefined) {
+              if (patch.notes && patch.notes.trim().length > 0) {
+                next.notes = patch.notes.trim()
+              } else {
+                delete next.notes
+              }
             }
             return next
           }),

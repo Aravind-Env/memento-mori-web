@@ -245,7 +245,7 @@ export function Dashboard({
   const [moreOpen, setMoreOpen] = useState(false)
 
   // Content changes that can alter any pill's width.
-  const actionsKey = `${chapters.length}|${goals.length}|${notesByWeek.size}|${peopleCount}|${reviewDue ? 1 : 0}|${gentleMode ? 1 : 0}`
+  const actionsKey = `${chapters.length}|${goals.length}|${notesByWeek.size}|${peopleCount}|${reviewDue ? 1 : 0}|${gentleMode ? 1 : 0}|${zoom}`
 
   useLayoutEffect(() => {
     const row = actionsRef.current
@@ -299,11 +299,9 @@ export function Dashboard({
           if (totalFor(nextHidden, true) <= avail) break
         }
       }
-      if (nextHidden.length === 0) setMoreOpen(false)
+      // Never auto-close the user-opened "···" menu; let the user control it.
       setCollapsed((prev) =>
-        prev.length === nextHidden.length && prev.every((k) => nextHidden.includes(k))
-          ? prev
-          : nextHidden,
+        JSON.stringify(prev) === JSON.stringify(nextHidden) ? prev : nextHidden,
       )
     }
     let raf = 0
@@ -319,7 +317,7 @@ export function Dashboard({
       ro.disconnect()
       cancelAnimationFrame(raf)
     }
-  }, [actionsKey, gentleMode])
+  }, [actionsKey])
 
   // Close the "···" menu on outside clicks or Escape.
   useEffect(() => {
