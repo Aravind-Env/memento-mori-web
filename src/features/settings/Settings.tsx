@@ -1,9 +1,18 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { MiniGrid } from '../grid/MiniGrid'
 import { parseISODate, toISODate } from '../../domain/dates'
 import { MAX_LIFE_YEARS, MIN_LIFE_YEARS } from '../../domain/lifeMath'
 import { DAY_SHORT } from '../../domain/review'
+import {
+  calculateStorageWarning,
+  formatBytes,
+  getBackupHealthStatus,
+  getLocalStorageSize,
+  type BackupFrequency,
+  type IntegrityCheckResult,
+} from '../../domain/storageHealth'
+import { repo } from '../../core/useJournal'
 import {
   VaultError,
   decryptJSON,
@@ -47,6 +56,44 @@ export function Settings({ onClose, onToast }: SettingsProps) {
     'Notification' in window ? Notification.permission : 'unsupported',
   )
 
+  const setBackupFrequency = useStore((s) => s.setBackupFrequency)
+  const recordBackupSuccess = useStore((s) => s.recordBackupSuccess)
+  const recordBackupFailure = useStore((s) => s.recordBackupFailure)
+
+  const [entryCount, setEntryCount] = useState(() => repo.liveDates().length)
+  const [storageText, setStorageText] = useState('Calculating...')
+  const [warningLevel, setWarningLevel] = useState<string>('normal')
+  const [integrityResult, setIntegrityResult] = useState<IntegrityCheckResult | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      setEntryCount(repo.liveDates().length)
+      const lsBytes = getLocalStorageSize()
+      if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {
+        try {
+          const est = await navigator.storage.estimate()
+          const usage = (est.usage ?? 0) + lsBytes
+          const quota = est.quota ?? 1
+          const pct = Math.round((usage / quota) * 100)
+          setStorageText(`${formatBytes(usage)} of ${formatBytes(quota)} (${pct}%)`)
+          setWarningLevel(calculateStorageWarning(pct))
+        } catch {
+          setStorageText(formatBytes(lsBytes) + ' (localStorage)')
+        }
+      } else {
+        setStorageText(formatBytes(lsBytes) + ' (localStorage)')
+      }
+    })()
+  }, [])
+
+  async function runIntegrityCheck() {
+    const res = await repo.integrityCheck()
+    setIntegrityResult(res)
+    onToast(res.ok ? 'Integrity check passed' : 'Integrity issues detected')
+  }
+
+  const backupHealth = getBackupHealthStatus(settings.lastBackupAt, settings.backupFrequency ?? 'weekly', Date.now(), settings.lastBackupFailed)
+
   type VaultDialog =
     | { kind: 'hidden' }
     | { kind: 'export' }
@@ -69,14 +116,20 @@ export function Settings({ onClose, onToast }: SettingsProps) {
   const dobDate = parseISODate(profile.dob)
 
   function handleExport() {
-    const blob = new Blob([exportJSON()], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `memento-mori-backup-${toISODate(new Date())}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    onToast('Backup downloaded')
+    try {
+      const blob = new Blob([exportJSON()], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `memento-mori-backup-${toISODate(new Date())}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      recordBackupSuccess()
+      onToast('Backup downloaded')
+    } catch {
+      recordBackupFailure()
+      onToast('Backup export failed')
+    }
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -110,9 +163,11 @@ export function Settings({ onClose, onToast }: SettingsProps) {
       a.download = `memento-mori-vault-${toISODate(new Date())}.json`
       a.click()
       URL.revokeObjectURL(url)
+      recordBackupSuccess()
       onToast('Encrypted backup downloaded')
       closeVaultDialog()
     } catch (err) {
+      recordBackupFailure()
       setVaultError(err instanceof VaultError ? err.message : 'Encryption is unavailable here.')
     } finally {
       setVaultBusy(false)
@@ -303,6 +358,66 @@ export function Settings({ onClose, onToast }: SettingsProps) {
             A calm one-time nudge when the app is open; asking by itself never happens without
             your click.
           </p>
+        </section>
+
+        <section className="settings__section">
+          <h3 className="settings__heading">Data Health Center</h3>
+          <p className="settings__note">
+            Monitor storage usage, verify database integrity, and configure backup reminders.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', margin: '12px 0' }}>
+            <div style={{ padding: '10px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', opacity: 0.7 }}>Database</div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>Healthy (v4)</div>
+            </div>
+            <div style={{ padding: '10px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', opacity: 0.7 }}>Journal Entries</div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>{entryCount} days</div>
+            </div>
+            <div style={{ padding: '10px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', opacity: 0.7 }}>Storage Used</div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>{storageText}</div>
+            </div>
+            <div style={{ padding: '10px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', opacity: 0.7 }}>Backup Health</div>
+              <div style={{ fontSize: '14px', fontWeight: 600, textTransform: 'capitalize' }}>{backupHealth}</div>
+            </div>
+          </div>
+
+          {warningLevel !== 'normal' && (
+            <div style={{ padding: '8px 12px', background: warningLevel === 'critical' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
+              ⚠ Storage warning ({warningLevel}): Approaching capacity. Please export a backup.
+            </div>
+          )}
+
+          <label className="field">
+            <span className="field__label">Backup Reminders</span>
+            <select
+              className="field__input"
+              value={settings.backupFrequency ?? 'weekly'}
+              onChange={(e) => setBackupFrequency(e.target.value as BackupFrequency)}
+            >
+              <option value="off">Off</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+          </label>
+
+          <div className="settings__actions" style={{ marginTop: '12px' }}>
+            <button type="button" className="btn" onClick={() => void runIntegrityCheck()}>
+              Run Database Integrity Check
+            </button>
+          </div>
+          {integrityResult && (
+            <div className="settings__note" style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '6px' }}>
+              {integrityResult.ok ? (
+                <span style={{ color: 'var(--success, #10b981)' }}>✓ Integrity check passed ({integrityResult.entryCount} entries, {integrityResult.versionCount} versions)</span>
+              ) : (
+                <span style={{ color: 'var(--danger, #ef4444)' }}>⚠ Integrity issues found: {integrityResult.errors.join(', ')}</span>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="settings__section">

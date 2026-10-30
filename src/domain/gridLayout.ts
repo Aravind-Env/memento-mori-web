@@ -346,3 +346,362 @@ export function labelPlan(sol: GridSolution): AxisLabel[] {
 export function captionText(lifeYears: number, totalWeeks: number): string {
   return `${lifeYears} years · ${totalWeeks.toLocaleString('en-US')} weeks`
 }
+
+export interface GridGeometryInput {
+  width: number
+  height: number
+  years: number
+  weeksPerYear: number
+  minPitch: number
+  maxPitch: number
+  labelFont: { size: number; measure: (text: string) => number }
+  footerH: number
+  padding: number
+  caption?: string
+}
+
+export interface GridGeometryBlock {
+  year: number
+  row: number
+  col: number
+  x: number
+  y: number
+}
+
+export interface GridGeometryRow {
+  index: number
+  firstYear: number
+  lastYear: number
+  centerY: number
+  label: string
+}
+
+export interface GridGeometry {
+  layout: 'decade' | 'packed'
+  pitch: number
+  dotRadius: number
+  blocksPerRow: number
+  rowCount: number
+  gutterW: number
+  originX: number
+  originY: number
+  blockW: number
+  blockH: number
+  blockGapX: number
+  blockGapY: number
+  decadeGapX: number
+  blocks: GridGeometryBlock[]
+  rows: GridGeometryRow[]
+  captionBox: { x: number; y: number; w: number; h: number; align: 'right' }
+  contentBox: { x: number; y: number; w: number; h: number }
+  labelFontSize: number
+  labelsVisible: boolean[]
+  caption: string
+  years: number
+  weeksPerYear: number
+}
+
+interface GeometryCandidate {
+  layout: 'decade' | 'packed'
+  blocksPerRow: number
+  pitch: number
+  blockGapY: number
+  blockGapX: number
+  gutterW: number
+  labelFontSize: number
+  labels: string[]
+  labelsVisible: boolean[]
+}
+
+const GEOMETRY_BLOCK_ROWS = 4
+const GEOMETRY_BLOCK_GAP = 1.3
+const GEOMETRY_DECADE_GAP = 0.6
+/** Compact-only floor for fixed desktop panels that cannot fit 5px cells. */
+const COMPACT_MIN_PITCH = 4.3
+
+function rowLabels(years: number, blocksPerRow: number, layout: 'decade' | 'packed'): string[] {
+  const count = Math.ceil(years / blocksPerRow)
+  return Array.from({ length: count }, (_, row) => {
+    const first = row * blocksPerRow
+    const last = Math.min(first + blocksPerRow - 1, years - 1)
+    return layout === 'decade' ? String(first) : `${first}-${last}`
+  })
+}
+
+function rowWidthUnits(
+  years: number,
+  blocksPerRow: number,
+  row: number,
+  weeksPerYear: number,
+  blockGapX = GEOMETRY_BLOCK_GAP,
+): number {
+  const first = row * blocksPerRow
+  const count = Math.min(blocksPerRow, years - first)
+  if (count <= 0) return 0
+  let decadeBoundaries = 0
+  for (let year = first + 1; year < first + count; year++) {
+    if (year % 10 === 0) decadeBoundaries++
+  }
+  return (
+    count * (weeksPerYear / GEOMETRY_BLOCK_ROWS) +
+    Math.max(count - 1, 0) * blockGapX +
+    decadeBoundaries * GEOMETRY_DECADE_GAP
+  )
+}
+
+function geometryCandidate(
+  input: GridGeometryInput,
+  blocksPerRow: number,
+  layout: 'decade' | 'packed',
+  footerH: number,
+): GeometryCandidate | null {
+  const years = Math.max(Math.ceil(input.years), 1)
+  const padding = Math.max(input.padding, 16)
+  const labels = rowLabels(years, blocksPerRow, layout)
+  const captionClearance = footerH > 0 ? 12 : 0
+  const measure = (text: string, size = 12) =>
+    input.labelFont.measure(text) * (size / Math.max(input.labelFont.size, 1))
+  const gutterW = Math.max(...labels.map((text) => measure(text))) + 12
+  const rowCount = labels.length
+  let blockGapX = GEOMETRY_BLOCK_GAP
+  const maxWidthUnits = Math.max(
+    ...Array.from({ length: rowCount }, (_, row) =>
+      rowWidthUnits(years, blocksPerRow, row, input.weeksPerYear, blockGapX),
+    ),
+  )
+  const availableW = input.width - 2 * padding - gutterW
+  const availableH = input.height - footerH - 2 * padding - captionClearance
+  if (availableW <= 0 || availableH <= 0) return null
+
+  const heightUnits = rowCount * GEOMETRY_BLOCK_ROWS + Math.max(rowCount - 1, 0) * GEOMETRY_BLOCK_GAP
+  const widthPitch = availableW / maxWidthUnits
+  const heightPitch = availableH / heightUnits
+  let pitch = Math.min(input.maxPitch, widthPitch, heightPitch)
+  let blockGapY: number
+
+  if (pitch >= input.minPitch) {
+    blockGapY = GEOMETRY_BLOCK_GAP * pitch
+  } else {
+    pitch = input.minPitch
+    const maxCount = Math.min(blocksPerRow, years)
+    const maxDecadeBoundaries = Math.max(
+      ...Array.from({ length: rowCount }, (_, row) => {
+        const first = row * blocksPerRow
+        const count = Math.min(blocksPerRow, years - first)
+        let boundaries = 0
+        for (let year = first + 1; year < first + count; year++) {
+          if (year % 10 === 0) boundaries++
+        }
+        return boundaries
+      }),
+    )
+    const baseUnits = maxCount * (input.weeksPerYear / GEOMETRY_BLOCK_ROWS) + maxDecadeBoundaries * GEOMETRY_DECADE_GAP
+    const gaps = Math.max(maxCount - 1, 0)
+    if (gaps > 0) blockGapX = Math.min(blockGapX, Math.max(0, (availableW / pitch - baseUnits) / gaps))
+    const compactWidth = Math.max(
+      ...Array.from({ length: rowCount }, (_, row) =>
+        rowWidthUnits(years, blocksPerRow, row, input.weeksPerYear, blockGapX),
+      ),
+    ) * pitch
+    const blockHeight = GEOMETRY_BLOCK_ROWS * pitch
+    if (compactWidth > availableW + 1e-6 || rowCount * blockHeight > availableH + 1e-6) return null
+    blockGapY = rowCount > 1
+      ? Math.min(GEOMETRY_BLOCK_GAP * pitch, (availableH - rowCount * blockHeight) / (rowCount - 1))
+      : 0
+  }
+
+  const blockHeight = GEOMETRY_BLOCK_ROWS * pitch
+  const rowCenters = Array.from({ length: rowCount }, (_, row) =>
+    row * (blockHeight + blockGapY) + blockHeight / 2,
+  )
+  let labelFontSize = 12
+  const canShowAll = (size: number) =>
+    rowCenters.every((center, i) => i === 0 || center - rowCenters[i - 1] >= size + 2)
+  if (!canShowAll(labelFontSize)) labelFontSize = 11
+  const labelsVisible = labels.map((_, i) => canShowAll(labelFontSize) || i % 2 === 0)
+
+  return { layout, blocksPerRow, pitch, blockGapY, blockGapX: blockGapX * pitch, gutterW, labelFontSize, labels, labelsVisible }
+}
+
+function buildGeometry(
+  input: GridGeometryInput,
+  candidate: GeometryCandidate,
+  footerH: number,
+): GridGeometry {
+  const years = Math.max(Math.ceil(input.years), 1)
+  const weeksPerYear = input.weeksPerYear
+  const rowCount = Math.ceil(years / candidate.blocksPerRow)
+  const pitch = candidate.pitch
+  const blockW = (weeksPerYear / GEOMETRY_BLOCK_ROWS) * pitch
+  const blockH = GEOMETRY_BLOCK_ROWS * pitch
+  const blockGapX = candidate.blockGapX
+  const decadeGapX = GEOMETRY_DECADE_GAP * pitch
+  const blockGapY = candidate.blockGapY
+  const gridW = Math.max(
+    ...Array.from({ length: rowCount }, (_, row) =>
+      rowWidthUnits(years, candidate.blocksPerRow, row, weeksPerYear, blockGapX / pitch) * pitch,
+    ),
+  )
+  const gridH = rowCount * blockH + Math.max(rowCount - 1, 0) * blockGapY
+  const contentW = candidate.gutterW + gridW
+  const padding = Math.max(input.padding, 16)
+  const usableH = input.height - footerH - 2 * padding - (footerH > 0 ? 12 : 0)
+  const contentX = (input.width - contentW) / 2
+  const originX = contentX + candidate.gutterW
+  const originY = padding + (usableH - gridH) / 2
+
+  const blocks: GridGeometryBlock[] = []
+  const rows: GridGeometryRow[] = []
+  for (let row = 0; row < rowCount; row++) {
+    const firstYear = row * candidate.blocksPerRow
+    const lastYear = Math.min(firstYear + candidate.blocksPerRow - 1, years - 1)
+    const y = originY + row * (blockH + blockGapY)
+    rows.push({
+      index: row,
+      firstYear,
+      lastYear,
+      centerY: y + blockH / 2,
+      label: candidate.labels[row],
+    })
+    let x = originX
+    for (let year = firstYear; year <= lastYear; year++) {
+      const col = year - firstYear
+      blocks.push({ year, row, col, x, y })
+      x += blockW
+      if (year < lastYear) {
+        x += blockGapX
+        if ((year + 1) % 10 === 0) x += decadeGapX
+      }
+    }
+  }
+
+  const caption = input.caption ?? captionText(years, years * weeksPerYear)
+  const captionW = input.labelFont.measure(caption) * (12 / Math.max(input.labelFont.size, 1))
+  const captionBox = footerH > 0
+    ? { x: contentX + contentW - captionW, y: input.height - padding - footerH, w: captionW, h: footerH, align: 'right' as const }
+    : { x: contentX + contentW, y: input.height, w: 0, h: 0, align: 'right' as const }
+
+  return {
+    layout: candidate.layout,
+    pitch,
+    dotRadius: pitch * DOT_RATIO,
+    blocksPerRow: candidate.blocksPerRow,
+    rowCount,
+    gutterW: candidate.gutterW,
+    originX,
+    originY,
+    blockW,
+    blockH,
+    blockGapX,
+    blockGapY,
+    decadeGapX,
+    blocks,
+    rows,
+    captionBox,
+    contentBox: { x: contentX, y: originY, w: contentW, h: gridH },
+    labelFontSize: candidate.labelFontSize,
+    labelsVisible: candidate.labelsVisible,
+    caption,
+    years,
+    weeksPerYear,
+  }
+}
+
+/** Compute all whole-life grid positions, labels, and footer from one pure input. */
+export function computeGridGeometry(input: GridGeometryInput): GridGeometry {
+  if (input.weeksPerYear <= 0 || input.weeksPerYear % GEOMETRY_BLOCK_ROWS !== 0) {
+    throw new RangeError('weeksPerYear must be a positive multiple of four.')
+  }
+  const minPitch = Math.max(input.minPitch, 0.1)
+  const normalized = { ...input, minPitch, maxPitch: Math.max(input.maxPitch, minPitch) }
+  const years = Math.max(Math.ceil(input.years), 1)
+  const packed: GeometryCandidate[] = []
+  for (let perRow = 1; perRow <= years; perRow++) {
+    const candidate = geometryCandidate(normalized, perRow, 'packed', input.footerH)
+    if (candidate) packed.push(candidate)
+  }
+  const bestPacked = packed.reduce<GeometryCandidate | null>(
+    (best, candidate) => !best || candidate.pitch > best.pitch ? candidate : best,
+    null,
+  )
+  const decade = geometryCandidate(normalized, 10, 'decade', input.footerH)
+  let selected = decade && (!bestPacked || decade.pitch >= bestPacked.pitch * 0.9) ? decade : bestPacked
+  let footerH = input.footerH
+
+  if (!selected) {
+    footerH = 0
+    const noFooterPacked: GeometryCandidate[] = []
+    for (let perRow = 1; perRow <= years; perRow++) {
+      const candidate = geometryCandidate(normalized, perRow, 'packed', 0)
+      if (candidate) noFooterPacked.push(candidate)
+    }
+    const noFooterBest = noFooterPacked.reduce<GeometryCandidate | null>(
+      (best, candidate) => !best || candidate.pitch > best.pitch ? candidate : best,
+      null,
+    )
+    const noFooterDecade = geometryCandidate(normalized, 10, 'decade', 0)
+    selected = noFooterDecade && (!noFooterBest || noFooterDecade.pitch >= noFooterBest.pitch * 0.9)
+      ? noFooterDecade
+      : noFooterBest
+  }
+
+  if (!selected) {
+    const compactInput = {
+      ...normalized,
+      minPitch: Math.min(normalized.minPitch, COMPACT_MIN_PITCH),
+    }
+    const compactPacked: GeometryCandidate[] = []
+    for (let perRow = 1; perRow <= years; perRow++) {
+      const candidate = geometryCandidate(compactInput, perRow, 'packed', 0)
+      if (candidate) compactPacked.push(candidate)
+    }
+    const compactBest = compactPacked.reduce<GeometryCandidate | null>(
+      (best, candidate) => !best || candidate.pitch > best.pitch ? candidate : best,
+      null,
+    )
+    const compactDecade = geometryCandidate(compactInput, 10, 'decade', 0)
+    selected = compactDecade && (!compactBest || compactDecade.pitch >= compactBest.pitch * 0.9)
+      ? compactDecade
+      : compactBest
+    footerH = 0
+  }
+
+  if (!selected) {
+    throw new RangeError('The panel is too small to fit the minimum grid pitch.')
+  }
+  return buildGeometry(normalized, selected, footerH)
+}
+
+/** Centre of a week using the whole-life geometry, in canvas-local pixels. */
+export function geometryDotCenter(geometry: GridGeometry, week: number): Pt | null {
+  if (week < 0 || week >= geometry.years * geometry.weeksPerYear) return null
+  const year = Math.floor(week / geometry.weeksPerYear)
+  const block = geometry.blocks[year]
+  if (!block) return null
+  const weekInYear = week % geometry.weeksPerYear
+  const quarter = Math.floor(weekInYear / (geometry.weeksPerYear / GEOMETRY_BLOCK_ROWS))
+  const weekInQuarter = weekInYear % (geometry.weeksPerYear / GEOMETRY_BLOCK_ROWS)
+  return {
+    x: block.x + weekInQuarter * geometry.pitch + geometry.pitch / 2,
+    y: block.y + quarter * geometry.pitch + geometry.pitch / 2,
+  }
+}
+
+/** Gap-aware inverse of `geometryDotCenter`. */
+export function geometryWeekAt(geometry: GridGeometry, x: number, y: number): number | null {
+  const row = geometry.rows.find(
+    (item) => y >= geometry.blocks[item.firstYear].y && y < geometry.blocks[item.firstYear].y + geometry.blockH,
+  )
+  if (!row) return null
+  for (let year = row.firstYear; year <= row.lastYear; year++) {
+    const block = geometry.blocks[year]
+    if (x < block.x || x >= block.x + geometry.blockW) continue
+    const weekColumn = Math.floor((x - block.x) / geometry.pitch)
+    const quarter = Math.floor((y - block.y) / geometry.pitch)
+    if (weekColumn < 0 || weekColumn >= geometry.weeksPerYear / GEOMETRY_BLOCK_ROWS) return null
+    if (quarter < 0 || quarter >= GEOMETRY_BLOCK_ROWS) return null
+    const week = year * geometry.weeksPerYear + quarter * (geometry.weeksPerYear / GEOMETRY_BLOCK_ROWS) + weekColumn
+    return week < geometry.years * geometry.weeksPerYear ? week : null
+  }
+  return null
+}

@@ -9,6 +9,9 @@ import { InsightsPanel } from '../features/insights/InsightsPanel'
 import { ReviewPanel } from '../features/review/ReviewPanel'
 import { PeoplePanel } from '../features/people/PeoplePanel'
 import { JournalPanel } from '../features/journal/JournalPanel'
+import { TimelinePanel } from '../features/timeline/TimelinePanel'
+import { HabitsPanel } from '../features/habits/HabitsPanel'
+import { AnnualReviewPanel } from '../features/annual-review/AnnualReviewPanel'
 import { Settings } from '../features/settings/Settings'
 import { AppLock } from '../features/settings/AppLock'
 import { Onboarding } from '../features/onboarding/Onboarding'
@@ -61,6 +64,9 @@ export function App() {
   const [journalOpen, setJournalOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [timelineOpen, setTimelineOpen] = useState(false)
+  const [habitsOpen, setHabitsOpen] = useState(false)
+  const [annualReviewOpen, setAnnualReviewOpen] = useState(false)
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
     document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
   )
@@ -435,6 +441,30 @@ export function App() {
               </svg>
               Settings
             </button>
+            <button
+              type="button"
+              className="mm-settings-pill"
+              onClick={() => setTimelineOpen(true)}
+              aria-label="Open life timeline"
+            >
+              📜 Timeline
+            </button>
+            <button
+              type="button"
+              className="mm-settings-pill"
+              onClick={() => setHabitsOpen(true)}
+              aria-label="Open habits & rituals"
+            >
+              ♻ Habits
+            </button>
+            <button
+              type="button"
+              className="mm-settings-pill"
+              onClick={() => setAnnualReviewOpen(true)}
+              aria-label="Open annual life review"
+            >
+              📅 Annual Review
+            </button>
           </div>
         </header>
 
@@ -583,6 +613,18 @@ export function App() {
 
       {settingsOpen && (
         <Settings onClose={() => setSettingsOpen(false)} onToast={showToast} />
+      )}
+
+      {timelineOpen && (
+        <TimelinePanel onClose={() => setTimelineOpen(false)} />
+      )}
+
+      {habitsOpen && (
+        <HabitsPanel onClose={() => setHabitsOpen(false)} />
+      )}
+
+      {annualReviewOpen && (
+        <AnnualReviewPanel onClose={() => setAnnualReviewOpen(false)} />
       )}
 
       <ToastView toast={toast} onDismiss={() => setToast(null)} />

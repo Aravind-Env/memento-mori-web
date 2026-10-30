@@ -1,0 +1,176 @@
+.drawer-habits {
+  max-width: 700px;
+  width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.habits__add {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.03));
+}
+
+.habits__input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 6px;
+  background: var(--bg-surface, #fff);
+  color: var(--text, #111);
+  font-size: 14px;
+}
+
+.habits__freq {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 6px;
+  background: var(--bg-surface, #fff);
+  color: var(--text, #111);
+  font-size: 13px;
+}
+
+.habits__section {
+  padding: 16px;
+}
+
+.habits__heading {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 10px 0;
+  opacity: 0.7;
+}
+
+.habits__section--archived .habits__heading {
+  opacity: 0.5;
+}
+
+.habits__empty {
+  font-size: 13px;
+  opacity: 0.6;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.habits__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.habit__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  background: var(--bg-surface, #fff);
+}
+
+.habit__row--archived {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.habit__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.habit__name {
+  font-size: 14px;
+  color: var(--text, #111);
+  font-weight: 500;
+}
+
+.habit__meta {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.habit__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.habit__done {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  background: var(--bg-surface, #fff);
+  color: var(--text-muted, #666);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.habit__done:hover {
+  border-color: var(--accent, #3b82f6);
+}
+
+.habit__done.is-done {
+  background: var(--success, #10b981);
+  border-color: var(--success, #10b981);
+  color: #fff;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  color: var(--text-muted, #666);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.06));
+}
+
+.btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 6px;
+  background: var(--bg-surface, #fff);
+  color: var(--text, #111);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--accent, #3b82f6);
+}
+
+.btn--primary {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  border-color: var(--accent, #3b82f6);
+}
+
+.btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+}

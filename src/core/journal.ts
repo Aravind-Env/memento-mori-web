@@ -23,9 +23,25 @@ import {
   weekOfDate,
 } from '../domain/daily'
 import type { DailyMetaLike } from '../domain/dailySearch'
+import type { IntegrityCheckResult } from '../domain/storageHealth'
 
 export const DB_NAME = 'memento-mori-journal'
-export const DB_VERSION = 3
+export const DB_VERSION = 4
+
+export interface EntryVersion {
+  id: string
+  date: string
+  meta: EntryMeta
+  body: EntryBody
+  createdAt: number
+}
+
+export interface JournalExportData {
+  entries: { meta: EntryMeta; body: EntryBody }[]
+  versions: EntryVersion[]
+  reviews: ReviewRecord[]
+  exportedAt: string
+}
 
 export interface EntryMeta {
   date: string
@@ -183,19 +199,30 @@ export class JournalRepository {
   version = 0
 
   async init(): Promise<void> {
-    this.db = await openDB(DB_NAME, DB_VERSION, (db) => {
-      db.createObjectStore('journal_meta', { keyPath: 'key' } as never)
-      const entries = db.createObjectStore('entries_meta', { keyPath: 'date' })
-      entries.createIndex('weekIndex', 'weekIndex')
-      entries.createIndex('updated', 'updatedAt')
-      entries.createIndex('mood', 'mood')
-      entries.createIndex('tag', 'tags', { multiEntry: true })
-      entries.createIndex('deleted', 'deletedAt')
-      db.createObjectStore('entries_body', { keyPath: 'date' })
-      db.createObjectStore('weeks_meta', { keyPath: 'weekIndex' })
-      db.createObjectStore('trash', { keyPath: 'date' })
-      db.createObjectStore('reviews', { keyPath: 'weekIndex' })
-      db.createObjectStore('fts', { keyPath: 'id' })
+    this.db = await openDB(DB_NAME, DB_VERSION, (db, _, oldVersion) => {
+      if (oldVersion < 1 || !db.objectStoreNames.contains('journal_meta')) {
+        if (!db.objectStoreNames.contains('journal_meta')) db.createObjectStore('journal_meta', { keyPath: 'key' } as never)
+        if (!db.objectStoreNames.contains('entries_meta')) {
+          const entries = db.createObjectStore('entries_meta', { keyPath: 'date' })
+          entries.createIndex('weekIndex', 'weekIndex')
+          entries.createIndex('updated', 'updatedAt')
+          entries.createIndex('mood', 'mood')
+          entries.createIndex('tag', 'tags', { multiEntry: true })
+          entries.createIndex('deleted', 'deletedAt')
+        }
+        if (!db.objectStoreNames.contains('entries_body')) db.createObjectStore('entries_body', { keyPath: 'date' })
+        if (!db.objectStoreNames.contains('weeks_meta')) db.createObjectStore('weeks_meta', { keyPath: 'weekIndex' })
+        if (!db.objectStoreNames.contains('trash')) db.createObjectStore('trash', { keyPath: 'date' })
+        if (!db.objectStoreNames.contains('reviews')) db.createObjectStore('reviews', { keyPath: 'weekIndex' })
+        if (!db.objectStoreNames.contains('fts')) db.createObjectStore('fts', { keyPath: 'id' })
+      }
+      if (oldVersion < 4) {
+        if (!db.objectStoreNames.contains('entry_versions')) {
+          const vStore = db.createObjectStore('entry_versions', { keyPath: 'id' })
+          vStore.createIndex('date', 'date')
+          vStore.createIndex('updated', 'createdAt')
+        }
+      }
     })
     const [rows, weekRows, trashRows] = await Promise.all([
       getAll<EntryMeta>(this.db.transaction('entries_meta').objectStore('entries_meta')),
@@ -484,6 +511,11 @@ export class JournalRepository {
   async saveEntry(date: string, input: EntryInput): Promise<EntryMeta | undefined> {
     if (!isValidKey(date)) throw new Error('Invalid date key')
     const existing = this.meta.get(date)
+    let existingBody: EntryBody | undefined
+    if (existing) {
+      existingBody = await this.rawBody(date)
+    }
+
     const bodyText = input.body ?? ''
     const title = input.title?.trim() ?? ''
     const goodThing = input.goodThing?.trim() ?? ''
@@ -497,6 +529,32 @@ export class JournalRepository {
       if (existing || this.trash.has(date)) await this.hardRemove(date)
       return undefined
     }
+
+    let hasChanged = true
+    if (existing && existingBody) {
+      try {
+        const oldText = await this.decodeBody(existingBody)
+        const sameText = oldText === bodyText
+        const sameTitle = (existing.title ?? '') === title
+        const sameMood = existing.mood === input.mood
+        const sameEnergy = existing.energy === input.energy
+        const sameGood = (existing.goodThing ?? '') === goodThing
+        const sameTags = JSON.stringify(existing.tags) === JSON.stringify(uniqueTags)
+        if (sameText && sameTitle && sameMood && sameEnergy && sameGood && sameTags) {
+          hasChanged = false
+        }
+      } catch {
+        hasChanged = true
+      }
+    }
+
+    const versionRow: EntryVersion | undefined = existing && existingBody && hasChanged ? {
+      id: `${date}-${existing.updatedAt}`,
+      date,
+      meta: existing,
+      body: existingBody,
+      createdAt: existing.updatedAt,
+    } : undefined
 
     const updatedAt = Date.now()
     const meta: EntryMeta = {
@@ -514,9 +572,17 @@ export class JournalRepository {
     }
     const encoded = await this.encodeBody(bodyText)
     const bodyRow: EntryBody = { date, updatedAt, ...encoded }
-    const tx = this.db.transaction(['entries_meta', 'entries_body', 'weeks_meta'], 'readwrite')
+
+    const storeNames = ['entries_meta', 'entries_body', 'weeks_meta']
+    if (versionRow && this.db.objectStoreNames.contains('entry_versions')) {
+      storeNames.push('entry_versions')
+    }
+    const tx = this.db.transaction(storeNames, 'readwrite')
     tx.objectStore('entries_meta').put(meta as never)
     tx.objectStore('entries_body').put(bodyRow as never)
+    if (versionRow && storeNames.includes('entry_versions')) {
+      tx.objectStore('entry_versions').put(versionRow as never)
+    }
     const weekPromise = recomputeWeekIn(tx as IDBTransaction, meta.weekIndex)
     await txnDone(tx, 'Saving failed')
     const week = await weekPromise
@@ -530,6 +596,196 @@ export class JournalRepository {
     this.notifyWorkerIndex(date, bodyText)
     this.bump()
     return meta
+  }
+
+  async getEntryVersions(date: string): Promise<EntryVersion[]> {
+    try {
+      if (!this.db || !this.db.objectStoreNames.contains('entry_versions')) return []
+      const store = this.db.transaction('entry_versions').objectStore('entry_versions')
+      const index = store.index('date')
+      const rows = await req<EntryVersion[]>(index.getAll(date))
+      return rows.sort((a, b) => b.createdAt - a.createdAt)
+    } catch {
+      return []
+    }
+  }
+
+  async restoreEntryVersion(date: string, versionId: string): Promise<boolean> {
+    try {
+      if (!this.db || !this.db.objectStoreNames.contains('entry_versions')) return false
+      const store = this.db.transaction('entry_versions').objectStore('entry_versions')
+      const version = await req<EntryVersion | undefined>(store.get(versionId))
+      if (!version || version.date !== date) return false
+
+      const text = await this.decodeBody(version.body)
+      await this.saveEntry(date, {
+        title: version.meta.title,
+        body: text,
+        mood: version.meta.mood,
+        energy: version.meta.energy,
+        tags: version.meta.tags,
+        goodThing: version.meta.goodThing,
+        migrated: version.meta.migrated,
+      })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async integrityCheck(): Promise<IntegrityCheckResult> {
+    const storesChecked = [
+      'journal_meta',
+      'entries_meta',
+      'entries_body',
+      'weeks_meta',
+      'trash',
+      'reviews',
+      'fts',
+      'entry_versions',
+    ]
+    const errors: string[] = []
+    let entryCount = 0
+    let versionCount = 0
+    let orphanedBodies = 0
+    let orphanedMetas = 0
+
+    try {
+      if (!this.db) {
+        return { ok: false, storesChecked, entryCount: 0, versionCount: 0, orphanedBodies: 0, orphanedMetas: 0, errors: ['Database not initialized'] }
+      }
+
+      const txNames = storesChecked.filter((s) => this.db.objectStoreNames.contains(s))
+      const tx = this.db.transaction(txNames, 'readonly')
+
+      const metas = await req<EntryMeta[]>(tx.objectStore('entries_meta').getAll())
+      entryCount = metas.length
+      const metaDates = new Set(metas.map((m) => m.date))
+
+      const bodies = await req<EntryBody[]>(tx.objectStore('entries_body').getAll())
+      const bodyDates = new Set(bodies.map((b) => b.date))
+
+      for (const d of bodyDates) {
+        if (!metaDates.has(d)) orphanedBodies++
+      }
+      for (const d of metaDates) {
+        if (!bodyDates.has(d)) orphanedMetas++
+      }
+
+      if (this.db.objectStoreNames.contains('entry_versions')) {
+        const versions = await req<unknown[]>(tx.objectStore('entry_versions').getAll())
+        versionCount = versions.length
+      }
+
+      await txnDone(tx, 'Integrity check transaction failed')
+
+      const ok = errors.length === 0 && orphanedBodies === 0 && orphanedMetas === 0
+      return { ok, storesChecked: txNames, entryCount, versionCount, orphanedBodies, orphanedMetas, errors }
+    } catch (err) {
+      return {
+        ok: false,
+        storesChecked,
+        entryCount,
+        versionCount,
+        orphanedBodies,
+        orphanedMetas,
+        errors: [(err as Error).message ?? 'Unknown integrity error'],
+      }
+    }
+  }
+
+  /* ------------------- unified export/import for journal ------------------ */
+
+  /**
+   * Export all journal entries, bodies, versions, and reviews as a serializable
+   * structure for inclusion in a unified application backup.
+   */
+  async exportAllEntries(): Promise<JournalExportData> {
+    const entries: { meta: EntryMeta; body: EntryBody }[] = []
+    for (const date of this.sorted) {
+      const meta = this.meta.get(date)
+      const body = await this.rawBody(date)
+      if (meta && body) {
+        entries.push({ meta, body })
+      }
+    }
+
+    const versions: EntryVersion[] = []
+    if (this.db.objectStoreNames.contains('entry_versions')) {
+      const versionRows = await req<EntryVersion[]>(
+        this.db.transaction('entry_versions').objectStore('entry_versions').getAll()
+      )
+      versions.push(...versionRows)
+    }
+
+    const reviews = await getAll<ReviewRecord>(
+      this.db.transaction('reviews').objectStore('reviews')
+    )
+
+    return {
+      entries,
+      versions,
+      reviews,
+      exportedAt: new Date().toISOString(),
+    }
+  }
+
+  /**
+   * Import journal entries, bodies, versions, and reviews from a unified backup.
+   * Skips entries whose `updatedAt` is not newer than existing.
+   */
+  async importAllEntries(data: JournalExportData): Promise<{ written: number; skipped: number }> {
+    let written = 0
+    let skipped = 0
+
+    // Import entries + bodies
+    for (const { meta, body } of data.entries) {
+      const existing = this.meta.get(meta.date)
+      if (existing && existing.updatedAt >= meta.updatedAt) {
+        skipped++
+        continue
+      }
+      const tx = this.txns(['entries_meta', 'entries_body', 'weeks_meta'])
+      tx.objectStore('entries_meta').put(meta as never)
+      tx.objectStore('entries_body').put(body as never)
+      const week = recomputeWeekIn(tx as IDBTransaction, meta.weekIndex)
+      await txnDone(tx, 'Import entry failed')
+      const w = await week
+      this.meta.set(meta.date, meta)
+      this.trash.delete(meta.date)
+      this.rebuildSorted()
+      if (w) this.weeks.set(w.weekIndex, w)
+      written++
+    }
+
+    // Import versions
+    if (this.db.objectStoreNames.contains('entry_versions')) {
+      for (const version of data.versions) {
+        const existing = await req<EntryVersion | undefined>(
+          this.db.transaction('entry_versions').objectStore('entry_versions').get(version.id)
+        )
+        if (!existing) {
+          const vTx = this.txns(['entry_versions'])
+          vTx.objectStore('entry_versions').put(version as never)
+          await txnDone(vTx, 'Import version failed')
+        }
+      }
+    }
+
+    // Import reviews
+    for (const review of data.reviews) {
+      const existing = await req<ReviewRecord | undefined>(
+        this.db.transaction('reviews').objectStore('reviews').get(review.weekIndex)
+      )
+      if (!existing) {
+        const rTx = this.txns(['reviews'])
+        rTx.objectStore('reviews').put(review as never)
+        await txnDone(rTx, 'Import review failed')
+      }
+    }
+
+    this.bump()
+    return { written, skipped }
   }
 
   private txns(names: string[]): IDBTransaction {

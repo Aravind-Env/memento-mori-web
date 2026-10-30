@@ -1,10 +1,12 @@
 import { DEFAULT_LIFE_YEARS } from '../domain/lifeMath'
 import { parseISODate, type LeapRule } from '../domain/dates'
 import type { ZoomLevel } from '../domain/zoom'
+import type { BackupFrequency } from '../domain/storageHealth'
+import type { Habit } from '../domain/habits'
 
 export type Theme = 'system' | 'light' | 'dark'
 
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 9
 
 export interface Profile {
   id: string
@@ -61,6 +63,17 @@ export interface Settings {
   reviewLastWeek?: number
   /** Require the vault passphrase when the app opens (record in `vault`). */
   appLock?: boolean
+  backupFrequency?: BackupFrequency
+  lastBackupAt?: number
+  lastBackupFailed?: boolean
+  lastDismissedAt?: number
+}
+
+export interface AnnualReviewRecord {
+  year: number
+  profileId: string
+  reflection: string
+  updatedAt: number
 }
 
 export interface AppData {
@@ -72,6 +85,8 @@ export interface AppData {
   settings: Settings
   vault: VaultRecord | null
   people: Relationship[]
+  habits: Habit[]
+  annualReviews: AnnualReviewRecord[]
 }
 
 /** The persistable slice plus chapters and goals, used by exports, imports and migrations. */
@@ -83,6 +98,8 @@ export interface PersistedData {
   settings: Settings
   vault: VaultRecord | null
   people: Relationship[]
+  habits: Habit[]
+  annualReviews: AnnualReviewRecord[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -90,6 +107,7 @@ export const DEFAULT_SETTINGS: Settings = {
   gentleMode: false,
   reduceMotion: false,
   zoom: 'life',
+  backupFrequency: 'weekly',
 }
 
 export function createId(): string {
@@ -204,6 +222,8 @@ export function migrateData(raw: unknown, version: number): PersistedData {
       settings,
       vault: version < 6 ? null : sanitizeVault(data.vault),
       people: version < 7 ? [] : sanitizePeople(data.people),
+      habits: version < 9 ? [] : sanitizeHabits(data.habits),
+      annualReviews: version < 9 ? [] : sanitizeAnnualReviews(data.annualReviews),
     }
   }
 
@@ -269,6 +289,56 @@ export function sanitizeGoals(raw: unknown): Goal[] {
       weekIndex,
       text: g.text,
       done: g.done === true,
+    })
+  }
+  return out
+}
+
+/** Read back a possibly-untrusted array of habits and keep only valid rows. */
+export function sanitizeHabits(raw: unknown): Habit[] {
+  if (!Array.isArray(raw)) return []
+  const out: Habit[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const h = item as Record<string, unknown>
+    if (typeof h.id !== 'string' || typeof h.name !== 'string') continue
+    const completions: Record<string, boolean> = {}
+    if (h.completions && typeof h.completions === 'object') {
+      for (const [k, v] of Object.entries(h.completions as Record<string, unknown>)) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(k) && v === true) {
+          completions[k] = true
+        }
+      }
+    }
+    out.push({
+      id: h.id,
+      profileId: typeof h.profileId === 'string' ? h.profileId : '',
+      name: h.name,
+      description: typeof h.description === 'string' ? h.description : undefined,
+      frequency: h.frequency === 'weekly' || h.frequency === 'custom' ? h.frequency : 'daily',
+      targetDays: Array.isArray(h.targetDays) ? h.targetDays.map(Number) : undefined,
+      archived: h.archived === true,
+      createdAt: typeof h.createdAt === 'string' ? h.createdAt : new Date().toISOString(),
+      completions,
+    })
+  }
+  return out
+}
+
+/** Read back a possibly-untrusted array of annual reviews and keep only valid rows. */
+export function sanitizeAnnualReviews(raw: unknown): AnnualReviewRecord[] {
+  if (!Array.isArray(raw)) return []
+  const out: AnnualReviewRecord[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const r = item as Record<string, unknown>
+    const year = Number(r.year)
+    if (!Number.isFinite(year) || year < 1900 || year > 2100) continue
+    out.push({
+      year,
+      profileId: typeof r.profileId === 'string' ? r.profileId : '',
+      reflection: typeof r.reflection === 'string' ? r.reflection : '',
+      updatedAt: Number.isFinite(Number(r.updatedAt)) ? Number(r.updatedAt) : Date.now(),
     })
   }
   return out

@@ -6,6 +6,7 @@
  */
 
 import type { Note } from '../data/model'
+import type { EntryMeta } from '../core/journal'
 import { WEEKS_PER_YEAR } from './dates'
 
 export interface ParsedQuery {
@@ -169,3 +170,150 @@ export function weekJumps(raw: string, totalCells: number, currentWeek: number):
   }
   return jumps
 }
+
+/* ------------------------------------------------------------------ */
+/* Extended search: journal entries (daily)                           */
+/* ------------------------------------------------------------------ */
+
+export interface EntrySearchFilters {
+  /** Plain lowercase words (AND semantics). */
+  terms: string[]
+  /** Lowercase tag names. */
+  tags: string[]
+  /** Exact mood filter (1-5). */
+  mood?: number
+  /** Inclusive start date (YYYY-MM-DD). */
+  from?: string
+  /** Inclusive end date (YYYY-MM-DD). */
+  to?: string
+  /** Chapter name substring to match against entry titles/excerpts. */
+  chapter?: string
+}
+
+export interface EntrySearchResult {
+  date: string
+  weekIndex: number
+  title?: string
+  mood?: number
+  tags: string[]
+  words: number
+  excerpt: string
+  score: number
+  snippet: string
+}
+
+function entryMatchesFilters(
+  entry: EntryMeta,
+  bodyText: string,
+  filters: EntrySearchFilters,
+): { matched: boolean; score: number } {
+  // Date range filter
+  if (filters.from && entry.date < filters.from) return { matched: false, score: 0 }
+  if (filters.to && entry.date > filters.to) return { matched: false, score: 0 }
+
+  // Mood filter
+  if (filters.mood !== undefined && entry.mood !== filters.mood) return { matched: false, score: 0 }
+
+  // Tag filter (AND semantics)
+  const loweredTags = (entry.tags ?? []).map((t) => t.toLowerCase())
+  for (const tag of filters.tags) {
+    if (!loweredTags.includes(tag)) return { matched: false, score: 0 }
+  }
+
+  // Chapter filter: match against title or excerpt
+  let chapterBonus = 0
+  if (filters.chapter) {
+    const ch = filters.chapter.toLowerCase()
+    const haystack = `${entry.title ?? ''} ${entry.excerpt}`.toLowerCase()
+    if (!haystack.includes(ch)) return { matched: false, score: 0 }
+    chapterBonus = 3
+  }
+
+  // Text term search (AND semantics across title + excerpt + body)
+  let score = chapterBonus
+  let allTermsMatched = true
+
+  const searchableText = `${entry.title ?? ''} ${entry.excerpt} ${bodyText}`.toLowerCase()
+
+  for (const term of filters.terms) {
+    const hits = countOccurrences(searchableText, term)
+    const inTags = loweredTags.some((t) => t.includes(term))
+    if (hits === 0 && !inTags) {
+      allTermsMatched = false
+      break
+    }
+    score += hits + (inTags ? 2 : 0)
+  }
+
+  if (!allTermsMatched && filters.terms.length > 0) {
+    return { matched: false, score: 0 }
+  }
+
+  // Bonus for filters applied
+  if (filters.tags.length > 0) score += 2
+  if (filters.mood !== undefined) score += 2
+
+  return { matched: true, score }
+}
+
+/**
+ * Search journal entries (daily) with filters for date range, tags, mood,
+ * chapter, and text terms. Returns results sorted by score desc, then date.
+ */
+export function searchEntries(
+  entries: Array<{ meta: EntryMeta; body: string }>,
+  filters: EntrySearchFilters,
+): EntrySearchResult[] {
+  const results: EntrySearchResult[] = []
+
+  // If no filters at all, return empty
+  if (
+    filters.terms.length === 0 &&
+    filters.tags.length === 0 &&
+    filters.mood === undefined &&
+    !filters.from &&
+    !filters.to &&
+    !filters.chapter
+  ) {
+    return []
+  }
+
+  for (const { meta, body } of entries) {
+    const match = entryMatchesFilters(meta, body, filters)
+    if (!match.matched) continue
+
+    results.push({
+      date: meta.date,
+      weekIndex: meta.weekIndex,
+      title: meta.title,
+      mood: meta.mood,
+      tags: meta.tags ?? [],
+      words: meta.words,
+      excerpt: meta.excerpt,
+      score: match.score,
+      snippet: previewText(`${meta.title ?? ''} ${meta.excerpt} ${body}`, filters.terms),
+    })
+  }
+
+  return results.sort((a, b) => b.score - a.score || a.date.localeCompare(b.date))
+}
+
+/**
+ * Search across both weekly notes and daily entries, returning unified results.
+ * Weekly notes are converted to entry-shaped results for consistent display.
+ */
+export function searchAllMemories(
+  notes: Note[],
+  entryPairs: Array<{ meta: EntryMeta; body: string }>,
+  filters: EntrySearchFilters,
+): { notes: SearchResult[]; entries: EntrySearchResult[] } {
+  const parsed: ParsedQuery = {
+    terms: filters.terms,
+    tags: filters.tags,
+    ...(filters.mood !== undefined ? { mood: filters.mood } : {}),
+  }
+  const noteResults = searchNotes(notes, parsed)
+  const entryResults = searchEntries(entryPairs, filters)
+  return { notes: noteResults, entries: entryResults }
+}
+

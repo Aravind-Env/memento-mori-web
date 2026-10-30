@@ -17,11 +17,11 @@ export function req<T>(r: IDBRequest<T> | IDBRequest): Promise<T> {
 export function openDB(
   name: string,
   version: number,
-  upgrade: (db: IDBDatabase, tx: IDBTransaction) => void,
+  upgrade: (db: IDBDatabase, tx: IDBTransaction, oldVersion: number) => void,
 ): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const open = indexedDB.open(name, version)
-    open.onupgradeneeded = () => upgrade(open.result, open.transaction!)
+    open.onupgradeneeded = (ev) => upgrade(open.result, open.transaction!, ev.oldVersion)
     open.onsuccess = () => resolve(open.result)
     open.onerror = () => reject(open.error ?? new Error('Could not open the journal database'))
     open.onblocked = () => reject(new Error('The journal database is open in another tab'))

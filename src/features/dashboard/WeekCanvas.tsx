@@ -1,24 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 
 import type { Chapter, Goal, Note } from '../../data/model'
 import { chapterAt, chapterWindowSegments } from '../../domain/chapters'
 import { weekStart } from '../../domain/dates'
+import { getNextWeekIndex, formatWeekAriaLabel } from '../../domain/canvasNav'
 import {
   captionText,
-  dotCenter,
-  labelPlan,
-  solutionHeight,
-  solveLayout,
-  weekAt,
-  type GridSolution,
+  computeGridGeometry,
+  geometryDotCenter,
+  geometryWeekAt,
+  type GridGeometry,
 } from '../../domain/gridLayout'
 
 const PAD_L = 34
 const PAD_T = 26
 const PAD_R = 4
 /** Caption strip reserved under the life plot ("60 years · 3,120 weeks"). */
-const PAD_B = 18
 const LIFE_COL_MARKS = [1, 13, 26, 39, 52]
+
+interface PulseIndicator {
+  x: number
+  y: number
+  clip?: { x: number; y: number; width: number; height: number; radius: number }
+}
 
 export interface WeekCanvasProps {
   /** Rendered rows in the current view (from `domain/zoom` layout). */
@@ -66,8 +71,8 @@ interface Layout {
   padT: number
   cs: number
   rs: number
-  /** Whole-life solver descriptor; set only in the life view. */
-  sol?: GridSolution
+  /** Whole-life geometry; set only in the life view. */
+  geometry?: GridGeometry
 }
 
 function cssVar(name: string): string {
@@ -147,7 +152,8 @@ export function WeekCanvas({
 
   const [width, setWidth] = useState(0)
   const [fontsReady, setFontsReady] = useState(false)
-  const [pulse, setPulse] = useState<{ x: number; y: number } | null>(null)
+  const [pulse, setPulse] = useState<PulseIndicator | null>(null)
+  const [lifeGeometry, setLifeGeometry] = useState<GridGeometry | null>(null)
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -170,7 +176,7 @@ export function WeekCanvas({
     return () => ro.disconnect()
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const cv = canvasRef.current
     if (!cv || !width) return
 
@@ -192,10 +198,13 @@ export function WeekCanvas({
         highlight,
         lifeYears,
         reduceMotion,
+        focusedWeek,
         setPulse,
+        setGeometry: setLifeGeometry,
       })
       return
     }
+    setLifeGeometry(null)
 
     // Decade/year zoom: a flat window, one cell right on the old geometry.
     const rsRatio = yearView ? 0.8 : 0.66
@@ -211,7 +220,7 @@ export function WeekCanvas({
     cv.style.height = `${height}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, width, height)
-    layoutRef.current = { padL: PAD_L, padT: PAD_T, cs, rs, sol: undefined }
+    layoutRef.current = { padL: PAD_L, padT: PAD_T, cs, rs, geometry: undefined }
 
     const lived = cssVar('--lived')
     const ahead = cssVar('--ahead')
@@ -410,9 +419,8 @@ export function WeekCanvas({
       if (!cv) return null
       const b = cv.getBoundingClientRect()
       const L = layoutRef.current
-      if (L.sol) {
-        // Gap-aware solver inverse: hovering between blocks finds nothing.
-        return weekAt(L.sol, clientX - b.left - L.padL, clientY - b.top - L.padT)
+      if (L.geometry) {
+        return geometryWeekAt(L.geometry, clientX - b.left, clientY - b.top)
       }
       if (!L.cs || !L.rs) return null
       const col = Math.floor((clientX - b.left - L.padL) / L.cs)
@@ -452,6 +460,25 @@ export function WeekCanvas({
 
   const onPointerLeave = useCallback(() => setTip(null), [])
 
+  const [focusedWeek, setFocusedWeek] = useState(weeksLived)
+  const [announcement, setAnnouncement] = useState('')
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const totalCells = rows * cols + weekOffset
+    const next = getNextWeekIndex(focusedWeek, e.key, totalCells, cols)
+    if (next !== focusedWeek) {
+      e.preventDefault()
+      setFocusedWeek(next)
+      const absoluteWeek = next + weekOffset
+      const hasNote = notesByWeek.has(absoluteWeek)
+      const chap = chapterAt(chapters, absoluteWeek)
+      setAnnouncement(formatWeekAriaLabel(absoluteWeek, dob, null, hasNote, 0, chap?.name))
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(focusedWeek + weekOffset)
+    }
+  }
+
   const onClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const wi = indexAt(e.clientX, e.clientY)
@@ -461,7 +488,17 @@ export function WeekCanvas({
   )
 
   return (
-    <div className="mm-grid" ref={wrapRef}>
+    <div
+      className="mm-grid"
+      ref={wrapRef}
+      tabIndex={0}
+      role="region"
+      aria-label="Life in weeks grid. Use arrow keys to navigate weeks, Enter or Space to open week."
+      onKeyDown={handleKeyDown}
+    >
+      <div className="sr-only" aria-live="polite" aria-atomic="true" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+        {announcement}
+      </div>
       <canvas
         ref={canvasRef}
         role="img"
@@ -470,9 +507,49 @@ export function WeekCanvas({
         onPointerLeave={onPointerLeave}
         onClick={onClick}
       />
-      {pulse && !reduceMotion && (
-        <div className="mm-pulse" style={{ left: pulse.x, top: pulse.y, background: 'var(--accent)' }} />
+      {lifeGeometry?.rows.map((row, index) => lifeGeometry.labelsVisible[index] ? (
+        <span
+          key={row.index}
+          className="mm-grid__age-label"
+          style={{
+            left: lifeGeometry.contentBox.x,
+            top: row.centerY,
+            width: lifeGeometry.gutterW - 12,
+            fontSize: lifeGeometry.labelFontSize,
+          }}
+        >
+          {row.label}
+        </span>
+      ) : null)}
+      {lifeGeometry && lifeGeometry.captionBox.h > 0 && (
+        <span
+          className="mm-grid__caption"
+          style={{
+            left: lifeGeometry.captionBox.x,
+            top: lifeGeometry.captionBox.y,
+            width: lifeGeometry.captionBox.w,
+            height: lifeGeometry.captionBox.h,
+          }}
+        >
+          {lifeGeometry.caption}
+        </span>
       )}
+      {pulse && !reduceMotion && (() => {
+        const clipped = pulse.clip
+        const style = clipped
+          ? {
+              left: clipped.x,
+              top: clipped.y,
+              width: clipped.width,
+              height: clipped.height,
+              margin: 0,
+              '--pulse-left': `${pulse.x - clipped.x - clipped.radius}px`,
+              '--pulse-top': `${pulse.y - clipped.y - clipped.radius}px`,
+              '--pulse-size': `${clipped.radius * 2}px`,
+            }
+          : { left: pulse.x, top: pulse.y, background: 'var(--accent)' }
+        return <div className={clipped ? 'mm-pulse mm-pulse--clipped' : 'mm-pulse'} style={style as CSSProperties} />
+      })()}
       <div
         className="mm-tip"
         style={{ left: tip?.x ?? 0, top: tip?.y ?? 0, opacity: tip ? 1 : 0 }}
@@ -496,11 +573,13 @@ interface LifeDraw {
   availableHeight: number
   notesByWeek: Map<number, Note>
   chapters: Chapter[]
-  goals: Goal[]
+  goals: CanvasGoal[]
   highlight?: Set<number>
   lifeYears?: number
   reduceMotion: boolean
-  setPulse: (p: { x: number; y: number } | null) => void
+  focusedWeek: number
+  setPulse: (p: PulseIndicator | null) => void
+  setGeometry: (geometry: GridGeometry | null) => void
 }
 
 function drawLife(
@@ -510,42 +589,48 @@ function drawLife(
   p: LifeDraw,
 ): void {
   const dpr = window.devicePixelRatio || 1
-  const plotW = Math.max(p.width - PAD_L - PAD_R, 24)
-  const plotH = Math.max(p.availableHeight - PAD_T - PAD_B, 40)
-  const sol = solveLayout({ width: plotW, height: plotH, totalWeeks: p.rows * p.cols })
-  const height = Math.max(PAD_T + solutionHeight(sol) + PAD_B, 60)
+  if (p.width <= 0 || p.availableHeight <= 0) return
+  const total = p.rows * p.cols
+  const years = Math.max(Math.ceil(total / p.cols), 1)
+  const lifeYears = p.lifeYears ?? Math.floor(p.baseWeeks / p.cols)
+  const caption = captionText(lifeYears, lifeYears * p.cols)
+  ctx.font = '12px Figtree, system-ui, sans-serif'
+  let geometry: GridGeometry
+  try {
+    geometry = computeGridGeometry({
+      width: p.width,
+      height: p.availableHeight,
+      years,
+      weeksPerYear: p.cols,
+      minPitch: 5,
+      maxPitch: 12,
+      labelFont: { size: 12, measure: (text) => ctx.measureText(text).width },
+      footerH: 20,
+      padding: 16,
+      caption,
+    })
+  } catch {
+    layoutRef.current = { padL: 0, padT: 0, cs: 0, rs: 0, geometry: undefined }
+    p.setGeometry(null)
+    p.setPulse(null)
+    return
+  }
+  const height = p.availableHeight
   cv.width = Math.round(p.width * dpr)
   cv.height = Math.round(height * dpr)
   cv.style.height = `${height}px`
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, p.width, height)
-  // Drawing, hit-testing and tooltips share this one descriptor.
-  layoutRef.current = { padL: PAD_L, padT: PAD_T, cs: 0, rs: 0, sol }
+  layoutRef.current = { padL: 0, padT: 0, cs: 0, rs: 0, geometry }
+  p.setGeometry(geometry)
 
   const lived = cssVar('--lived')
   const ahead = cssVar('--ahead')
   const accent = cssVar('--accent')
   const bonus = cssVar('--accent2')
-  const muted = cssVar('--muted')
-  const r = sol.radius
-  const total = sol.totalWeeks
+  const r = geometry.dotRadius
 
-  // Age labels in the gutter every 10 years; blocks sharing a row fall back
-  // to a centred label above their block so nothing overlaps.
-  ctx.fillStyle = muted
-  ctx.font = '11px Figtree, system-ui, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'middle'
-  for (const l of labelPlan(sol)) {
-    ctx.fillText(l.text, PAD_L - 12, PAD_T + l.y)
-    if (l.inPlotX !== undefined) {
-      ctx.textAlign = 'center'
-      ctx.fillText(l.text, PAD_L + l.inPlotX, PAD_T + l.y - 3)
-      ctx.textAlign = 'right'
-    }
-  }
-
-  // Chapter index per week (absolute; the life window covers everything).
+  // Chapter bands follow the same year blocks as the dot geometry.
   const chapterColors = new Map<string, string>()
   for (const c of p.chapters) {
     if (!chapterColors.has(c.color)) {
@@ -556,49 +641,92 @@ function drawLife(
   const chapterOf = new Int16Array(total).fill(-1)
   for (let ci = 0; ci < p.chapters.length; ci++) {
     const c = p.chapters[ci]
-    if (!chapterColors.has(c.color)) continue
+    const color = chapterColors.get(c.color)
+    if (!color) continue
     const from = Math.max(c.startWeek, 0)
     const to = Math.min(c.endWeek, total - 1)
     for (let wi = from; wi <= to; wi++) chapterOf[wi] = ci
-  }
-
-  let focus: { x: number; y: number } | null = null
-  const dots = new DotBuckets()
-  for (let wi = 0; wi < total; wi++) {
-    const c = dotCenter(sol, wi)
-    if (!c) continue
-    if (wi === p.weeksLived) {
-      focus = { x: PAD_L + c.x, y: PAD_T + c.y }
-      dots.add(accent, focus.x, focus.y, r * 1.9)
-      continue
+    let week = from
+    while (week <= to) {
+      const year = Math.floor(week / p.cols)
+      const block = geometry.blocks[year]
+      const weekInYear = week % p.cols
+      const quarter = Math.floor(weekInYear / (p.cols / 4))
+      const segmentEnd = Math.min(to, year * p.cols + (quarter + 1) * (p.cols / 4) - 1)
+      const endCol = segmentEnd % p.cols % (p.cols / 4)
+      ctx.globalAlpha = 0.1
+      ctx.fillStyle = color
+      bandRect(
+        ctx,
+        block.x + (weekInYear % (p.cols / 4)) * geometry.pitch,
+        block.y + quarter * geometry.pitch,
+        (endCol - (weekInYear % (p.cols / 4)) + 1) * geometry.pitch,
+        geometry.pitch,
+        Math.min(4, geometry.pitch * 0.4),
+      )
+      week = segmentEnd + 1
     }
-    const chapterColor =
-      chapterOf[wi] >= 0 ? (chapterColors.get(p.chapters[chapterOf[wi]].color) ?? null) : null
-    if (p.notesByWeek.has(wi)) {
-      dots.add(accent, PAD_L + c.x, PAD_T + c.y, r * 1.4)
-      continue
-    }
-    const base = wi < p.weeksLived ? (wi >= p.baseWeeks ? bonus : lived) : ahead
-    const key = chapterColor !== null && wi < p.weeksLived ? chapterColor : base
-    const size = chapterColor !== null && wi >= p.weeksLived ? r * 0.9 : r
-    dots.add(key, PAD_L + c.x, PAD_T + c.y, size)
-    // Future weeks inside a chapter get a soft wash like the window view.
-    if (chapterColor !== null && wi >= p.weeksLived) dots.add(chapterColor, PAD_L + c.x, PAD_T + c.y, r * 0.45)
   }
-  dots.fill(ctx)
+  ctx.globalAlpha = 1
 
-  // Glow streak through the current week's flow-row.
-  if (focus) {
-    const g = ctx.createLinearGradient(PAD_L, 0, PAD_L + plotW, 0)
-    const pos = (focus.x - PAD_L) / Math.max(plotW, 1)
+  const currentYear = Math.floor(p.weeksLived / p.cols)
+  const currentBlock = geometry.blocks[currentYear]
+  const focusCenter = geometryDotCenter(geometry, p.weeksLived)
+  if (focusCenter && currentBlock) {
+    const g = ctx.createLinearGradient(currentBlock.x, 0, currentBlock.x + geometry.blockW, 0)
+    const pos = (focusCenter.x - currentBlock.x) / geometry.blockW
     g.addColorStop(0, 'rgba(238,108,77,0)')
     g.addColorStop(Math.max(0, pos - 0.25), 'rgba(238,108,77,.10)')
     g.addColorStop(pos, 'rgba(238,108,77,.35)')
     g.addColorStop(Math.min(1, pos + 0.35), 'rgba(238,108,77,.06)')
     g.addColorStop(1, 'rgba(238,108,77,0)')
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(currentBlock.x, currentBlock.y, geometry.blockW, geometry.blockH)
+    ctx.clip()
     ctx.fillStyle = g
-    ctx.fillRect(PAD_L, focus.y - r * 4, plotW, r * 8)
-    p.setPulse(focus)
+    ctx.fillRect(currentBlock.x, currentBlock.y, geometry.blockW, geometry.blockH)
+    ctx.restore()
+  }
+
+  let focus: { x: number; y: number } | null = null
+  const dots = new DotBuckets()
+  for (let wi = 0; wi < total; wi++) {
+    const c = geometryDotCenter(geometry, wi)
+    if (!c) continue
+    if (wi === p.weeksLived) {
+      focus = { x: c.x, y: c.y }
+      dots.add(accent, focus.x, focus.y, r * 1.45)
+      continue
+    }
+    const chapterColor =
+      chapterOf[wi] >= 0 ? (chapterColors.get(p.chapters[chapterOf[wi]].color) ?? null) : null
+    if (p.notesByWeek.has(wi)) {
+      dots.add(accent, c.x, c.y, r * 1.4)
+      continue
+    }
+    const base = wi < p.weeksLived ? (wi >= p.baseWeeks ? bonus : lived) : ahead
+    const key = chapterColor !== null && wi < p.weeksLived ? chapterColor : base
+    const size = chapterColor !== null && wi >= p.weeksLived ? r * 0.9 : r
+    dots.add(key, c.x, c.y, size)
+    // Future weeks inside a chapter get a soft wash like the window view.
+    if (chapterColor !== null && wi >= p.weeksLived) dots.add(chapterColor, c.x, c.y, r * 0.45)
+  }
+  dots.fill(ctx)
+
+  // Keep the pulse inside the same year block as the current week.
+  if (focus) {
+    const block = geometry.blocks[currentYear]
+    p.setPulse(block ? {
+      ...focus,
+      clip: {
+        x: block.x,
+        y: block.y,
+        width: geometry.blockW,
+        height: geometry.blockH,
+        radius: geometry.dotRadius,
+      },
+    } : focus)
   } else {
     p.setPulse(null)
   }
@@ -611,14 +739,14 @@ function drawLife(
     total,
     p.weeksLived,
     r,
-    sol.pitch,
+    geometry.pitch,
     (j) => {
-      const c = dotCenter(sol, j)
-      return c ? PAD_L + c.x : NaN
+      const c = geometryDotCenter(geometry, j)
+      return c ? c.x : NaN
     },
     (j) => {
-      const c = dotCenter(sol, j)
-      return c ? PAD_T + c.y : NaN
+      const c = geometryDotCenter(geometry, j)
+      return c ? c.y : NaN
     },
   )
 
@@ -627,24 +755,29 @@ function drawLife(
     ctx.lineWidth = Math.max(1.4, r * 0.5)
     for (const wi of p.highlight) {
       if (wi < 0 || wi >= total || wi === p.weeksLived) continue
-      const c = dotCenter(sol, wi)
+      const c = geometryDotCenter(geometry, wi)
       if (!c) continue
       ctx.beginPath()
       ctx.strokeStyle = accent
       ctx.globalAlpha = 0.9
-      ctx.arc(PAD_L + c.x, PAD_T + c.y, r * 1.7, 0, 6.2832)
+      ctx.arc(c.x, c.y, r * 1.7, 0, 6.2832)
       ctx.stroke()
     }
     ctx.globalAlpha = 1
   }
 
-  // Caption, bottom-right: "60 years · 3,120 weeks".
-  ctx.font = '10.5px Figtree, system-ui, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'alphabetic'
-  ctx.fillStyle = muted
-  const years = p.lifeYears ?? Math.ceil(total / 52)
-  ctx.fillText(captionText(years, total), p.width - PAD_R - 2, height - 5)
+  // Focus ring
+  if (p.focusedWeek >= 0 && p.focusedWeek < total) {
+    const c = geometryDotCenter(geometry, p.focusedWeek)
+    if (c) {
+      ctx.beginPath()
+      ctx.strokeStyle = cssVar('--accent') || '#3b82f6'
+      ctx.lineWidth = Math.max(1.8, r * 0.6)
+      ctx.arc(c.x, c.y, r * 1.8, 0, 6.2832)
+      ctx.stroke()
+    }
+  }
+
 }
 
 /**

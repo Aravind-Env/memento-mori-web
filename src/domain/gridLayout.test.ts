@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   captionText,
+  computeGridGeometry,
   dotCenter,
+  geometryDotCenter,
+  geometryWeekAt,
   labelPlan,
   solutionHeight,
   solutionWidth,
@@ -138,5 +141,135 @@ describe('labels and caption', () => {
 
   it('writes the caption with the estimate and total weeks', () => {
     expect(captionText(60, 3120)).toBe('60 years · 3,120 weeks')
+  })
+})
+
+const geometryInput = (width: number, height: number, years = 61) => ({
+  width,
+  height,
+  years,
+  weeksPerYear: 52,
+  minPitch: 5,
+  maxPitch: 12,
+  labelFont: {
+    size: 12,
+    measure: (text: string) => Array.from(text).reduce((sum, char) => sum + (char === '-' ? 4 : 7), 0),
+  },
+  footerH: 20,
+  padding: 16,
+})
+
+describe('computeGridGeometry', () => {
+  it.each([
+    [1000, 150], [1000, 170], [1000, 200],
+    [1100, 150], [1100, 170], [1100, 200],
+    [1250, 150], [1250, 170], [1250, 200],
+    [1440, 150], [1440, 170], [1440, 200],
+  ])('centres labels and content at %sx%s', (width, height) => {
+    const geometry = computeGridGeometry(geometryInput(width, height))
+    for (const row of geometry.rows) {
+      const first = geometry.blocks[row.firstYear]
+      expect(row.centerY).toBeCloseTo(first.y + geometry.blockH / 2, 1)
+    }
+    expect(geometry.contentBox.x).toBeCloseTo((width - geometry.contentBox.w) / 2, 1)
+    if (geometry.captionBox.h > 0) {
+      const topClearance = geometry.contentBox.y - 16
+      const bottomClearance =
+        geometry.captionBox.y - 12 - (geometry.contentBox.y + geometry.contentBox.h)
+      expect(topClearance).toBeCloseTo(bottomClearance, 1)
+    }
+    expect(geometry.pitch).toBeGreaterThanOrEqual(5)
+  })
+
+  it('keeps row labels separate from each other and every dot box', () => {
+    const geometry = computeGridGeometry(geometryInput(1250, 200))
+    const measure = geometryInput(1250, 200).labelFont.measure
+    const visible = geometry.rows.filter((_, i) => geometry.labelsVisible[i])
+    for (let i = 0; i < visible.length; i++) {
+      const row = visible[i]
+      const label = {
+        left: geometry.originX - 12 - measure(row.label) * geometry.labelFontSize / 12,
+        right: geometry.originX - 12,
+        top: row.centerY - geometry.labelFontSize / 2,
+        bottom: row.centerY + geometry.labelFontSize / 2,
+      }
+      for (const other of visible.slice(i + 1)) {
+        expect(label.bottom <= other.centerY - geometry.labelFontSize / 2 ||
+          other.centerY + geometry.labelFontSize / 2 <= label.top).toBe(true)
+      }
+      for (const block of geometry.blocks) {
+        expect(label.right <= block.x || label.left >= block.x + geometry.blockW ||
+          label.bottom <= block.y || label.top >= block.y + geometry.blockH).toBe(true)
+      }
+    }
+    expect(geometry.labelsVisible.filter(Boolean).length).toBeGreaterThan(0)
+  })
+
+  it('centres the content with equal padding and reserves a clear caption footer when possible', () => {
+    const geometry = computeGridGeometry(geometryInput(1250, 200))
+    expect(geometry.contentBox.x).toBeGreaterThanOrEqual(16)
+    expect(1250 - geometry.contentBox.x - geometry.contentBox.w).toBeCloseTo(geometry.contentBox.x, 1)
+    expect(geometry.captionBox.h).toBe(20)
+    expect(geometry.captionBox.x).toBeGreaterThanOrEqual(16)
+    expect(geometry.captionBox.x + geometry.captionBox.w).toBeCloseTo(
+      geometry.contentBox.x + geometry.contentBox.w,
+      5,
+    )
+    expect(200 - geometry.captionBox.y - geometry.captionBox.h).toBeGreaterThanOrEqual(12)
+    expect(geometry.captionBox.y).toBeGreaterThanOrEqual(12)
+    for (const block of geometry.blocks) {
+      expect(geometry.captionBox.y - (block.y + geometry.blockH)).toBeGreaterThanOrEqual(12)
+      const intersects = geometry.captionBox.x < block.x + geometry.blockW &&
+        geometry.captionBox.x + geometry.captionBox.w > block.x &&
+        geometry.captionBox.y < block.y + geometry.blockH &&
+        geometry.captionBox.y + geometry.captionBox.h > block.y
+      expect(intersects).toBe(false)
+    }
+  })
+
+  it('prefers decade rows when readable and labels packed rows by their full age range', () => {
+    const decade = computeGridGeometry(geometryInput(1920, 1080))
+    expect(decade.layout).toBe('decade')
+    expect(decade.rows.map((row) => row.label)).toEqual(['0', '10', '20', '30', '40', '50', '60'])
+    expect(decade.rows.length).toBe(decade.labelsVisible.filter(Boolean).length)
+
+    const packed = computeGridGeometry(geometryInput(1250, 150))
+    expect(packed.layout).toBe('packed')
+    expect(packed.rows.map((row) => row.label)).toEqual(['0-15', '16-31', '32-47', '48-60'])
+    expect(packed.rows.length).toBe(packed.labelsVisible.filter(Boolean).length)
+  })
+
+  it.each([61, 80, 30])('round-trips every dot and rejects block gaps for %s years', (years) => {
+    const geometry = computeGridGeometry(geometryInput(1920, 1080, years))
+    for (let week = 0; week < years * 52; week++) {
+      const center = geometryDotCenter(geometry, week)
+      expect(center).not.toBeNull()
+      expect(geometryWeekAt(geometry, center!.x, center!.y)).toBe(week)
+    }
+    const block = geometry.blocks[0]
+    if (geometry.blocksPerRow > 1) {
+      const next = geometry.blocks[1]
+      const x = (block.x + geometry.blockW + next.x) / 2
+      expect(geometryWeekAt(geometry, x, block.y + geometry.pitch / 2)).toBeNull()
+    } else if (geometry.rowCount > 1) {
+      const y = block.y + geometry.blockH + geometry.blockGapY / 2
+      expect(geometryWeekAt(geometry, block.x + geometry.pitch / 2, y)).toBeNull()
+    }
+  })
+
+  it('is deterministic for the same input', () => {
+    const input = geometryInput(1440, 300)
+    expect(computeGridGeometry(input)).toEqual(computeGridGeometry(input))
+  })
+
+  it('uses the documented compact floor only when a 5px life grid cannot fit', () => {
+    const geometry = computeGridGeometry(geometryInput(706, 193, 81))
+    expect(geometry.pitch).toBeCloseTo(4.3, 5)
+    expect(geometry.captionBox.h).toBe(0)
+    expect(geometry.rows).toHaveLength(9)
+    expect(geometry.layout).toBe('decade')
+    expect(geometry.rows.map((row) => row.label)).toEqual(['0', '10', '20', '30', '40', '50', '60', '70', '80'])
+    expect(geometry.contentBox.y).toBeGreaterThanOrEqual(16)
+    expect(193 - geometry.contentBox.y - geometry.contentBox.h).toBeGreaterThanOrEqual(16)
   })
 })

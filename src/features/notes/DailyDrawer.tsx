@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import './dailyDrawer.css'
 import { useJournal } from '../../core/useJournal'
+import type { EntryVersion } from '../../core/journal'
 import {
   dateKey,
   countWords,
@@ -81,6 +82,38 @@ export function DailyDrawer({
   const [locked, setLocked] = useState(false)
   const [thisDay, setThisDay] = useState<{ date: string; yearsAgo: number; excerpt: string; mood?: number }[]>([])
   const [otdOpen, setOtdOpen] = useState(false)
+  const [versions, setVersions] = useState<EntryVersion[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+
+  useEffect(() => {
+    if (tab !== 'day') return
+    let stale = false
+    void (async () => {
+      const vList = await repo.getEntryVersions(cursor)
+      if (!stale) setVersions(vList)
+    })()
+    return () => {
+      stale = true
+    }
+  }, [cursor, tab, version, repo])
+
+  async function handleRestoreVersion(versionId: string) {
+    const ok = await repo.restoreEntryVersion(cursor, versionId)
+    if (ok) {
+      onToast('Version restored')
+      setHistoryOpen(false)
+      const meta = repo.getMeta(cursor)
+      setTitle(meta?.title ?? '')
+      setMood(meta?.mood)
+      setEnergy(meta?.energy)
+      setTags((meta?.tags ?? []).join(', '))
+      setGoodThing(meta?.goodThing ?? '')
+      const text = await repo.body(cursor)
+      setBody(text)
+    } else {
+      onToast('Could not restore version')
+    }
+  }
 
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const saveTimer = useRef<number | null>(null)
@@ -304,6 +337,38 @@ export function DailyDrawer({
 
         {tab === 'day' ? (
           <div className="drawer-body" data-qa="drawer-day">
+            {versions.length > 0 && (
+              <div style={{ marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  style={{ fontSize: '12px', padding: '4px 10px' }}
+                  onClick={() => setHistoryOpen(!historyOpen)}
+                >
+                  📜 Version History ({versions.length})
+                </button>
+                {historyOpen && (
+                  <div style={{ marginTop: '8px', padding: '10px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '8px', maxHeight: '160px', overflowY: 'auto' }}>
+                    {versions.map((v) => (
+                      <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px' }}>
+                        <div>
+                          <strong>{new Date(v.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+                          <span style={{ opacity: 0.7, marginLeft: '8px' }}>{v.meta.words} words</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ fontSize: '11px', padding: '2px 8px' }}
+                          onClick={() => void handleRestoreVersion(v.id)}
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="day-strip" role="navigation" aria-label="Days of this week">
               <button
                 className="icon-btn"
