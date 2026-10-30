@@ -5,7 +5,7 @@ import { calculateSharedLife } from '../../domain/sharedLife'
 import { useStore } from '../../state/store'
 import './people.css'
 
-const KINDS = ['parent', 'partner', 'child', 'sibling', 'friend', 'other'] as const
+const KINDS = ['parent', 'partner', 'child', 'sibling', 'friend', 'other', 'others'] as const
 
 export interface PeoplePanelProps {
   people: Relationship[]
@@ -41,6 +41,7 @@ export function PeoplePanel({
   const [dob, setDob] = useState('')
   const [expectedLifespan, setExpectedLifespan] = useState<number | undefined>(userLifeYears)
   const [notes, setNotes] = useState('')
+  const [customKind, setCustomKind] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const nameRef = useRef<HTMLInputElement>(null)
@@ -50,9 +51,11 @@ export function PeoplePanel({
   }, [])
 
   function startEdit(person: Relationship) {
+    const isCustomKind = !KINDS.includes(person.kind as typeof KINDS[number])
     setEditingId(person.id)
     setName(person.name)
-    setKind((KINDS as readonly string[]).includes(person.kind) ? (person.kind as (typeof KINDS)[number]) : 'other')
+    setKind(isCustomKind ? 'others' : (person.kind as typeof KINDS[number]))
+    setCustomKind(isCustomKind ? person.kind : '')
     setVisits(person.visitsPerYear)
     setDob(person.dob ?? '')
     setExpectedLifespan(person.expectedLifespan ?? undefined)
@@ -69,6 +72,7 @@ export function PeoplePanel({
     setDob('')
     setExpectedLifespan(userLifeYears)
     setNotes('')
+    setCustomKind('')
     setError('')
   }
 
@@ -77,14 +81,19 @@ export function PeoplePanel({
       setError('A name helps you remember who this is.')
       return
     }
+    if (kind === 'others' && !customKind.trim()) {
+      setError('Please enter a relationship type.')
+      return
+    }
     if (visits < 0 || visits > 366) {
       setError('Visits per year sit between 0 and 366.')
       return
     }
+    const resolvedKind = kind === 'others' ? customKind.trim() : kind
     if (editingId) {
       updatePerson(editingId, {
         name,
-        kind,
+        kind: resolvedKind,
         visitsPerYear: visits,
         dob: dob || undefined,
         expectedLifespan: expectedLifespan !== undefined ? expectedLifespan : undefined,
@@ -93,7 +102,7 @@ export function PeoplePanel({
       cancelEdit()
       return
     }
-    if (addPerson(name, kind, visits, dob || undefined, expectedLifespan, notes || undefined)) {
+    if (addPerson(name, resolvedKind, visits, dob || undefined, expectedLifespan, notes || undefined)) {
       cancelEdit()
     }
   }
@@ -269,6 +278,24 @@ export function PeoplePanel({
               />
             </label>
           </div>
+
+          {kind === 'others' && (
+            <label className="field">
+              <span className="field__label">Relationship type</span>
+              <input
+                type="text"
+                className="field__input"
+                value={customKind}
+                placeholder="Enter relationship type"
+                maxLength={60}
+                onChange={(e) => {
+                  setCustomKind(e.target.value)
+                  setError('')
+                }}
+              />
+              <span className="field__hint">e.g. Mentor, Colleague, Neighbour</span>
+            </label>
+          )}
 
           <div className="people-form__pair">
             <label className="field">
