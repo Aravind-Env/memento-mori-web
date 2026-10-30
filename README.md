@@ -4,6 +4,12 @@ A calm, private **life-in-weeks** visualizer. Enter your date of birth and see y
 
 > *"It is not that we have a short time to live, but that we waste much of it."* — Seneca
 
+## 🌐 Try it
+
+**Live demo:** https://aravind-env.github.io/memento-mori-web/
+
+Deployed automatically on every push to `main` via GitHub Pages. It runs entirely in your browser — nothing is sent to a server.
+
 ---
 
 ## Why
@@ -161,6 +167,8 @@ Pushing to `main` triggers `.github/workflows/deploy.yml`, which:
 1. installs dependencies and runs the tests,
 2. builds the app (setting `BASE_URL` to `/<repo>/` for a project site),
 3. publishes `dist/` to GitHub Pages.
+
+The live site is hosted at **https://aravind-env.github.io/memento-mori-web/**.
 
 To enable it, set **Settings → Pages → Source** to **GitHub Actions** in the repository.
 
