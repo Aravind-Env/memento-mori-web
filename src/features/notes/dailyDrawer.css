@@ -122,7 +122,7 @@
 }
 
 .link-btn.danger {
-  color: #b34527;
+  color: var(--accent-ink);
 }
 
 .journal-body {

@@ -23,7 +23,7 @@ import {
 } from '../../domain/zoom'
 import { useElementSize } from '../../shared/hooks'
 import { WeekCanvas } from './WeekCanvas'
-import sceneUrl from '../../assets/cosmic-dawn.png'
+import { Icon, type IconName } from '../../shared/Icon'
 import type { LifeStats } from '../../domain/lifeMath'
 import './dashboard.css'
 
@@ -52,7 +52,7 @@ function compactDate(value: Date | string, short = false): string {
 /** Small caps eyebrow tile: icon + one-line label. */
 function ValueTile({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <div className="mm-tile">
+    <div className="mm-tile spot">
       <span className="mm-tile__icon" aria-hidden="true">
         {icon}
       </span>
@@ -68,10 +68,16 @@ export function MomentPanel({ quote }: { quote: Quote }) {
       <div className="mm-side__head">
         <span className="mm-orb" aria-hidden="true" />
         <p className="mm-side__label">This moment</p>
+        <span className="mm-side__date">
+          {new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}
+        </span>
       </div>
 
       <blockquote className="mm-quote">
-        <p>&ldquo;{quote.text}&rdquo;</p>
+        <span className="mm-quote__mark" aria-hidden="true">
+          &ldquo;
+        </span>
+        <p>{quote.text}</p>
         <cite>{quote.author}</cite>
       </blockquote>
 
@@ -80,39 +86,10 @@ export function MomentPanel({ quote }: { quote: Quote }) {
       </div>
 
       <div className="mm-values">
-        <ValueTile
-          icon={
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" />
-            </svg>
-          }
-          label="Be present"
-        />
-        <ValueTile
-          icon={
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 21v-9M12 12c0-4-3-6-7-6 0 4 3 6 7 6zM12 14c0-3 2-5 6-5 0 3-2 5-6 5z" />
-            </svg>
-          }
-          label="Focus on what you can control"
-        />
-        <ValueTile
-          icon={
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M2.5 19l6.5-10 4 6 3-4 5.5 8z" />
-            </svg>
-          }
-          label="Appreciate the journey"
-        />
-        <ValueTile
-          icon={
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5" />
-            </svg>
-          }
-          label="Make it meaningful"
-        />
+        <ValueTile icon={<Icon name="hourglass" size={17} />} label="Be present" />
+        <ValueTile icon={<Icon name="sprout" size={17} />} label="Focus on what you can control" />
+        <ValueTile icon={<Icon name="mountain" size={17} />} label="Appreciate the journey" />
+        <ValueTile icon={<Icon name="sparkles" size={17} />} label="Make it meaningful" />
       </div>
     </aside>
   )
@@ -134,7 +111,7 @@ function StatCell({
   chip?: boolean
 }) {
   return (
-    <div className="mm-stat">
+    <div className="mm-stat spot">
       <span className="mm-stat__value">{value}</span>
       <span className="mm-stat__labelrow">
         <span className="mm-stat__label">{label}</span>
@@ -182,6 +159,13 @@ export interface DashboardProps {
 }
 
 const ZOOM_LEVELS = ['life', 'decade', 'year'] as const
+
+const MENU_ICONS: Record<string, IconName> = {
+  goals: 'target',
+  insights: 'insights',
+  journal: 'book',
+  people: 'people',
+}
 
 /** "Your life in weeks" hero card — the main dashboard view. */
 export function Dashboard({
@@ -352,6 +336,7 @@ export function Dashboard({
   }
 
   const yearsAhead = Math.max(lifeYears - stats.ageYears, 0)
+  const journalCount = (dayMeta?.size ?? 0) || notesByWeek.size
 
   return (
     <>
@@ -364,7 +349,7 @@ export function Dashboard({
             <span className="mm-headline__sep" aria-hidden="true">
               ·
             </span>
-            <span className="mm-headline__num">{yearsAhead}</span>
+            <span className="mm-headline__num mm-headline__num--accent">{yearsAhead}</span>
             <span className="mm-headline__word">years ahead</span>
           </h1>
 
@@ -405,7 +390,7 @@ export function Dashboard({
                       : setYear((y) => clampYear(y - 1, stats.totalRows))
                   }
                 >
-                  ‹
+                  <Icon name="chevronLeft" size={15} />
                 </button>
                 <span className="mm-stepper-label" aria-live="polite">
                   {zoom === 'decade'
@@ -422,7 +407,7 @@ export function Dashboard({
                       : setYear((y) => clampYear(y + 1, stats.totalRows))
                   }
                 >
-                  ›
+                  <Icon name="chevronRight" size={15} />
                 </button>
               </div>
             )}
@@ -449,14 +434,8 @@ export function Dashboard({
         )}
 
         {/* 3. Hero card: photo + frosted week grid */}
-        <figure className="mm-hero">
-          <img
-            className="mm-hero__photo"
-            src={sceneUrl}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-          />
+        <figure className="mm-hero spot">
+          <div className="mm-hero__glow" aria-hidden="true" />
           <div className="mm-hero__panel">
             <div className="mm-chart" ref={chartRef}>
               <WeekCanvas
@@ -491,7 +470,7 @@ export function Dashboard({
             Lived
           </span>
           <span>
-            <i style={{ background: 'var(--accent)' }} />
+            <i className="mm-legend-now" style={{ background: 'var(--accent)' }} />
             This week
           </span>
           <span>
@@ -546,9 +525,7 @@ export function Dashboard({
               data-key="chapter-edit"
               onClick={onOpenChapters}
             >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M8 3v10M3 8h10" />
-              </svg>
+              <Icon name="layers" size={15} />
               Name a chapter
             </button>
           ) : (
@@ -559,9 +536,7 @@ export function Dashboard({
               onClick={onOpenChapters}
               aria-label="Edit chapters"
             >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M2 13.5l.5-2.5 7.8-7.8a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L5.5 13l-2.5.5z" />
-              </svg>
+              <Icon name="pen" size={15} />
               Edit chapters
             </button>
           )}
@@ -574,10 +549,9 @@ export function Dashboard({
             aria-label="Your journal — read every note"
             title="Your journal (J)"
           >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2 3.2c1.8-.9 3.9-.9 6-.2v10c-2.1-.7-4.2-.7-6 .2V3.2zM14 3.2c-1.8-.9-3.9-.9-6-.2v10c2.1-.7 4.2-.7 6 .2V3.2z" />
-            </svg>
-            {(dayMeta?.size ?? 0) === 0 && notesByWeek.size === 0 ? <>Journal</> : <>Journal · {(dayMeta?.size ?? notesByWeek.size).toLocaleString()}</>}
+            <Icon name="book" size={15} />
+            Journal
+            {journalCount > 0 ? <span className="mm-pill__count">{journalCount.toLocaleString()}</span> : null}
           </button>
           <button
             type="button"
@@ -587,15 +561,13 @@ export function Dashboard({
             onClick={onOpenGoals}
             aria-label="Goals and milestones"
           >
+            <Icon name="target" size={15} />
             {goals.length === 0 ? (
-              <>
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M8 3v10M3 8h10" />
-                </svg>
-                Set a goal
-              </>
+              <>Set a goal</>
             ) : (
-              <>Goals · {pendingGoals(goals).length} ahead</>
+              <>
+                Goals <span className="mm-pill__count">{pendingGoals(goals).length} ahead</span>
+              </>
             )}
           </button>
           <button
@@ -606,16 +578,9 @@ export function Dashboard({
             onClick={onOpenInsights}
             aria-label="Insights about your notes"
           >
-            {notesByWeek.size === 0 ? (
-              <>
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M8 3v10M3 8h10" />
-                </svg>
-                Insights
-              </>
-            ) : (
-              <>Insights · {notesByWeek.size}</>
-            )}
+            <Icon name="insights" size={15} />
+            Insights
+            {notesByWeek.size > 0 ? <span className="mm-pill__count">{notesByWeek.size}</span> : null}
           </button>
           {!gentleMode ? (
             <button
@@ -626,16 +591,9 @@ export function Dashboard({
               onClick={onOpenPeople}
               aria-label="People and shared time"
             >
-              {peopleCount === 0 ? (
-                <>
-                  <svg viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M8 3v10M3 8h10" />
-                  </svg>
-                  People
-                </>
-              ) : (
-                <>People · {peopleCount}</>
-              )}
+              <Icon name="people" size={15} />
+              People
+              {peopleCount > 0 ? <span className="mm-pill__count">{peopleCount}</span> : null}
             </button>
           ) : null}
           <div className="mm-more">
@@ -647,7 +605,7 @@ export function Dashboard({
               aria-label="More actions"
               onClick={() => setMoreOpen((o) => !o)}
             >
-              ···
+              <Icon name="more" size={18} strokeWidth={2.6} />
             </button>
             {moreOpen && (
               <div className="mm-more__menu" role="menu" aria-label="More actions">
@@ -667,6 +625,7 @@ export function Dashboard({
                         else onOpenPeople()
                       }}
                     >
+                      <Icon name={MENU_ICONS[k] ?? 'more'} size={15} />
                       {k === 'goals'
                         ? goals.length === 0
                           ? 'Set a goal'
@@ -676,9 +635,9 @@ export function Dashboard({
                             ? 'Insights'
                             : `Insights · ${notesByWeek.size}`
                           : k === 'journal'
-                            ? (dayMeta?.size ?? 0) === 0 && notesByWeek.size === 0
+                            ? journalCount === 0
                               ? 'Journal'
-                              : `Journal · ${(dayMeta?.size ?? notesByWeek.size).toLocaleString()}`
+                              : `Journal · ${journalCount.toLocaleString()}`
                             : peopleCount === 0
                               ? 'People'
                               : `People · ${peopleCount}`}
@@ -695,9 +654,7 @@ export function Dashboard({
             aria-label="Weekly review ritual"
             aria-current={reviewDue ? 'true' : undefined}
           >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2.5 8a5.5 5.5 0 1 1 1.6 3.9M2.5 8V5M2.5 8h3" />
-            </svg>
+            <Icon name="review" size={15} />
             {reviewDue ? 'Review · ready' : 'Review'}
           </button>
         </div>
@@ -735,20 +692,20 @@ export function Dashboard({
             onOpenDay ? onOpenDay(dateKey(new Date())) : onSelectWeek(stats.weeksLived)
           }
         >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M2 13.5l.5-2.5 7.8-7.8a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L5.5 13l-2.5.5z" />
-          </svg>
+          <Icon name="pen" size={16} />
           {stats.isBonus ? 'Write today\u2019s entry' : 'Make today count \u2014 write it down'}
         </button>
 
         <p className="mm-caption">
           <span>{name ? `${name} · born ${compactDate(dob)} · ${lifeYears}-year estimate` : `${compactDate(dob)} · ${lifeYears}-year estimate`}</span>
           <span className="mm-caption__keys" aria-hidden="true">
-            <kbd>N</kbd> note
+            <kbd>N</kbd> today
             <kbd>Z</kbd> zoom
+            <kbd>J</kbd> journal
+            <kbd>Ctrl K</kbd> search
           </span>
           <span className="mm-sr">
-            Press N for this week&apos;s note, Z to zoom.
+            Press N for today&apos;s entry, Z to zoom, J for the journal, Ctrl+K to search.
           </span>
         </p>
       </main>

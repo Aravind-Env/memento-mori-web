@@ -70,12 +70,374 @@
 
 .goal-form {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.85rem;
+  border-radius: 14px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  background: var(--glass-strong);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05), var(--glass-rim);
+}
+
+/* ============================================================
+   Glass Smooth Sleek Animated Calendar Picker
+   ============================================================ */
+
+.cal-picker {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 12px;
   background: var(--bg);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+/* "From date to date" range banner */
+.cal-range-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(238, 108, 77, 0.1) 0%, rgba(244, 145, 95, 0.04) 100%);
+  border: 1px solid rgba(238, 108, 77, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.cal-range-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cal-range-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.cal-range-counter {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--muted);
+  font-feature-settings: 'tnum';
+}
+
+.cal-range-dates {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.2rem 0;
+}
+
+.cal-date-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.cal-date-lbl {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.cal-date-val {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+  font-feature-settings: 'tnum';
+}
+
+.cal-date-arrow {
+  color: var(--accent);
+  font-size: 1.15rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.cal-range-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(238, 108, 77, 0.12);
+}
+
+.cal-chip {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-feature-settings: 'tnum';
+}
+
+.cal-chip--warn {
+  background: rgba(225, 29, 72, 0.1);
+  border-color: rgba(225, 29, 72, 0.3);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Controls: Month & Year dropdowns + Quick Jump */
+.cal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.cal-dropdown-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+}
+
+.cal-quick-group {
+  flex: 0 0 auto;
+}
+
+.cal-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat right 0.55rem center;
+  padding: 0.38rem 1.6rem 0.38rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.cal-select:hover {
+  border-color: var(--accent);
+  background-color: var(--bg-hover);
+}
+
+.cal-select:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-wash);
+}
+
+.cal-select--month {
+  min-width: 105px;
+}
+
+.cal-select--year {
+  min-width: 78px;
+}
+
+.cal-select--preset {
+  min-width: 130px;
+}
+
+/* Calendar Month Header with Prev/Next buttons */
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0.2rem;
+}
+
+.cal-month-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.cal-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-out);
+}
+
+.cal-nav-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  color: var(--accent);
+  transform: scale(1.05);
+}
+
+.cal-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Weekday column labels */
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  padding-bottom: 0.2rem;
+}
+
+.cal-weekday {
+  padding: 0.15rem 0;
+}
+
+/* Animated 7-column day grid */
+.cal-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  animation: calFadeIn 0.22s var(--ease-out);
+}
+
+@keyframes calFadeIn {
+  from {
+    opacity: 0.35;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cal-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  user-select: none;
+}
+
+.cal-day:hover:not(:disabled) {
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+
+.cal-day--outside {
+  opacity: 0.35;
+}
+
+.cal-day--disabled {
+  opacity: 0.2;
+  cursor: not-allowed !important;
+  color: var(--muted);
+}
+
+.cal-day--disabled:hover {
+  background: transparent !important;
+  transform: none !important;
+}
+
+/* Selected week highlighting (connected strip) */
+.cal-day--selected-week {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  font-weight: 600;
+  border-radius: 2px;
+}
+
+.cal-day--week-start {
+  background: var(--grad-brand) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border-radius: 7px;
+  box-shadow: 0 2px 8px var(--accent-glow);
+  transform: scale(1.05);
+  z-index: 1;
+}
+
+.cal-day__num {
+  line-height: 1;
+}
+
+/* Existing goal dot marker */
+.cal-day__dot {
+  position: absolute;
+  bottom: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.cal-day--week-start .cal-day__dot {
+  background: #ffffff;
+}
+
+/* Direct date input */
+.cal-direct-date {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 0.2rem;
+  border-top: 1px dashed var(--border);
+}
+
+.cal-direct-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.cal-direct-input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.4rem;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.cal-direct-input:focus {
+  border-color: var(--accent);
 }
 
 @media (max-width: 560px) {

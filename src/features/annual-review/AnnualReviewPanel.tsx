@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import './annualReview.css'
 import { useStore } from '../../state/store'
@@ -95,7 +96,7 @@ export function AnnualReviewPanel({ onClose }: AnnualReviewPanelProps) {
                 disabled={year <= 1900}
                 aria-label="Previous year"
               >
-                ‹
+                <Icon name="chevronLeft" size={16} />
               </button>
               <button
                 type="button"
@@ -103,10 +104,10 @@ export function AnnualReviewPanel({ onClose }: AnnualReviewPanelProps) {
                 onClick={() => setYear((y) => y + 1)}
                 aria-label="Next year"
               >
-                ›
+                <Icon name="chevronRight" size={16} />
               </button>
             </div>
-            <button className="icon-btn" onClick={onClose} aria-label="Close review" data-qa="annual-review-close">✕</button>
+            <button className="icon-btn" onClick={onClose} aria-label="Close review" data-qa="annual-review-close"><Icon name="close" size={16} /></button>
           </header>
 
           <div className="drawer-body" data-qa="annual-review-body">
@@ -189,7 +190,7 @@ export function AnnualReviewPanel({ onClose }: AnnualReviewPanelProps) {
               disabled={summary.year <= 1900}
               aria-label="Previous year"
             >
-              ‹
+              <Icon name="chevronLeft" size={16} />
             </button>
             <button
               type="button"
@@ -197,10 +198,10 @@ export function AnnualReviewPanel({ onClose }: AnnualReviewPanelProps) {
               onClick={() => setYear((y) => y + 1)}
               aria-label="Next year"
             >
-              ›
+              <Icon name="chevronRight" size={16} />
             </button>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close review" data-qa="annual-review-close">✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close review" data-qa="annual-review-close"><Icon name="close" size={16} /></button>
         </header>
 
         <div className="drawer-body" data-qa="annual-review-body">

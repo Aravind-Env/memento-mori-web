@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import './timeline.css'
 import { useJournal } from '../../core/useJournal'
@@ -81,7 +82,7 @@ export function TimelinePanel({ onClose }: TimelinePanelProps) {
             <p className="drawer__eyebrow">Life Timeline</p>
             <h2 className="drawer__title">Your memories in order</h2>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close timeline" data-qa="timeline-close">✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close timeline" data-qa="timeline-close"><Icon name="close" size={16} /></button>
         </header>
 
         <div className="drawer-body" data-qa="timeline-body">

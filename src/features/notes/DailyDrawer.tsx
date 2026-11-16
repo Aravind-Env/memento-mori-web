@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import './dailyDrawer.css'
 import { useJournal } from '../../core/useJournal'
@@ -332,7 +333,7 @@ export function DailyDrawer({
             <button role="tab" aria-selected={tab === 'day'} className={`drawer-tab${tab === 'day' ? ' on' : ''}`} onClick={() => switchTab('day')} data-qa="tab-day">Day</button>
             <button role="tab" aria-selected={tab === 'week'} className={`drawer-tab${tab === 'week' ? ' on' : ''}`} onClick={() => switchTab('week')} data-qa="tab-week">Week</button>
           </div>
-          <button className="icon-btn" onClick={close} aria-label="Close journal" data-qa="drawer-close">✕</button>
+          <button className="icon-btn" onClick={close} aria-label="Close journal" data-qa="drawer-close"><Icon name="close" size={16} /></button>
         </header>
 
         {tab === 'day' ? (
@@ -345,7 +346,7 @@ export function DailyDrawer({
                   style={{ fontSize: '12px', padding: '4px 10px' }}
                   onClick={() => setHistoryOpen(!historyOpen)}
                 >
-                  📜 Version History ({versions.length})
+                  <Icon name="history" size={14} /> Version history ({versions.length})
                 </button>
                 {historyOpen && (
                   <div style={{ marginTop: '8px', padding: '10px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '8px', maxHeight: '160px', overflowY: 'auto' }}>
@@ -375,7 +376,7 @@ export function DailyDrawer({
                 aria-label="Previous day"
                 onClick={() => switchDay(shiftKey(cursor, -1))}
               >
-                ‹
+                <Icon name="chevronLeft" size={16} />
               </button>
               {strip?.map((d) => (
                 <button
@@ -396,7 +397,7 @@ export function DailyDrawer({
                 disabled={compareKeys(cursor, todayKey) >= 0}
                 onClick={() => switchDay(shiftKey(cursor, 1))}
               >
-                ›
+                <Icon name="chevronRight" size={16} />
               </button>
               <input
                 type="date"

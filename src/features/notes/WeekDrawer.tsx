@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import { formatRange, weekRange } from '../../domain/dates'
 import { weekAge } from '../../domain/lifeMath'
@@ -81,7 +82,7 @@ export function WeekDrawer({ weekIndex, dob, currentWeek, onClose, onToast }: We
             <h2 className="drawer__title">{formatRange(start, end)}</h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close note">
-            ×
+            <Icon name="close" size={16} />
           </button>
         </header>
 

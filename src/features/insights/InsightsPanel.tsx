@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import { useJournal } from '../../core/useJournal'
 import './insights.css'
@@ -108,7 +109,7 @@ export function InsightsPanel({ weeksLived, onClose }: InsightsPanelProps) {
             <h2 className="drawer__title">Patterns from your journal</h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close insights">
-            ×
+            <Icon name="close" size={16} />
           </button>
         </header>
 
