@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Icon } from '../../shared/Icon'
+import { Select } from '../../shared/Select'
 
 import type { Relationship } from '../../data/model'
 import { calculateSharedLife } from '../../domain/sharedLife'
@@ -125,7 +127,7 @@ export function PeoplePanel({
   return (
     <div className="drawer-scrim" onClick={onClose}>
       <div
-        className="drawer"
+        className="drawer drawer--people"
         role="dialog"
         aria-modal="true"
         aria-label="People and shared time"
@@ -142,7 +144,7 @@ export function PeoplePanel({
             onClick={onClose}
             aria-label="Close people"
           >
-            ×
+            <Icon name="close" size={16} />
           </button>
         </header>
 
@@ -216,7 +218,7 @@ export function PeoplePanel({
                     onClick={() => handleDelete(person)}
                     aria-label={`Remove ${person.name}`}
                   >
-                    ×
+                    <Icon name="trash" size={14} />
                   </button>
                 </li>
               )
@@ -247,18 +249,12 @@ export function PeoplePanel({
           <div className="people-form__pair">
             <label className="field">
               <span className="field__label">Kind</span>
-              <select
-                className="field__input"
+              <Select
                 value={kind}
-                aria-label="Relationship kind"
-                onChange={(e) => setKind(e.target.value as (typeof KINDS)[number])}
-              >
-                {KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {k[0].toUpperCase() + k.slice(1)}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Relationship kind"
+                onChange={setKind}
+                options={KINDS.map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) }))}
+              />
             </label>
 
             <label className="field">

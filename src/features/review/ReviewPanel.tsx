@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import type { Note } from '../../data/model'
 import { formatRange, weekRange } from '../../domain/dates'
@@ -72,7 +73,7 @@ export function ReviewPanel({ currentWeek, dob, onClose, onToast }: ReviewPanelP
             <h2 className="drawer__title">What mattered, and what matters?</h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close review">
-            ×
+            <Icon name="close" size={16} />
           </button>
         </header>
 

@@ -1,4 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
+import { Icon } from '../../shared/Icon'
+import { Select } from '../../shared/Select'
 
 import './habits.css'
 import { useStore } from '../../state/store'
@@ -66,7 +68,7 @@ export function HabitsPanel({ onClose }: HabitsPanelProps) {
             <p className="drawer__eyebrow">Habits & Rituals</p>
             <h2 className="drawer__title">Gentle consistency</h2>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close habits" data-qa="habits-close">✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close habits" data-qa="habits-close"><Icon name="close" size={16} /></button>
         </header>
 
         <div className="drawer-body" data-qa="habits-body">
@@ -80,15 +82,16 @@ export function HabitsPanel({ onClose }: HabitsPanelProps) {
               onChange={(e) => setNewHabitName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addHabitHandler()}
             />
-            <select
-              className="habits__freq"
+            <Select
+              ariaLabel="Habit frequency"
               value={newHabitFrequency}
-              onChange={(e) => setNewHabitFrequency(e.target.value as any)}
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="custom">Custom days</option>
-            </select>
+              onChange={setNewHabitFrequency}
+              options={[
+                { value: 'daily', label: 'Daily' },
+                { value: 'weekly', label: 'Weekly' },
+                { value: 'custom', label: 'Custom days' },
+              ]}
+            />
             <button type="button" className="btn btn--primary" onClick={addHabitHandler} disabled={!newHabitName.trim()}>
               Add
             </button>
@@ -128,7 +131,7 @@ export function HabitsPanel({ onClose }: HabitsPanelProps) {
                           aria-label={isDone ? 'Mark incomplete' : 'Mark complete for today'}
                           aria-pressed={isDone}
                         >
-                          {isDone ? '✓' : '○'}
+                          <Icon name={isDone ? 'check' : 'circle'} size={16} strokeWidth={isDone ? 2.4 : 1.6} />
                         </button>
                         <button
                           type="button"
@@ -136,7 +139,7 @@ export function HabitsPanel({ onClose }: HabitsPanelProps) {
                           onClick={() => archiveHabit(habit.id, true)}
                           aria-label="Archive habit"
                         >
-                          ⟳
+                          <Icon name="archive" size={16} />
                         </button>
                       </div>
                     </li>
@@ -163,7 +166,7 @@ export function HabitsPanel({ onClose }: HabitsPanelProps) {
                         onClick={() => archiveHabit(habit.id, false)}
                         aria-label="Restore habit"
                       >
-                        ↩
+                        <Icon name="restore" size={16} />
                       </button>
                       <button
                         type="button"
@@ -171,7 +174,7 @@ export function HabitsPanel({ onClose }: HabitsPanelProps) {
                         onClick={() => removeHabit(habit.id)}
                         aria-label="Delete habit"
                       >
-                        ×
+                        <Icon name="trash" size={14} />
                       </button>
                     </div>
                   </li>

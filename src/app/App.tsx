@@ -14,10 +14,12 @@ import { HabitsPanel } from '../features/habits/HabitsPanel'
 import { AnnualReviewPanel } from '../features/annual-review/AnnualReviewPanel'
 import { Settings } from '../features/settings/Settings'
 import { AppLock } from '../features/settings/AppLock'
-import { Onboarding } from '../features/onboarding/Onboarding'
+import { Onboarding, type LifePreview } from '../features/onboarding/Onboarding'
 import { CommandPalette } from '../features/search/CommandPalette'
+import { GpuBackdrop } from '../shared/GpuBackdrop'
+import { Icon } from '../shared/Icon'
 import { parseISODate } from '../domain/dates'
-import { getLifeStats } from '../domain/lifeMath'
+import { DEFAULT_LIFE_YEARS, getLifeStats } from '../domain/lifeMath'
 import { getDailyQuote } from '../domain/quotes'
 import { nextZoom } from '../domain/zoom'
 import { reviewDue } from '../domain/review'
@@ -71,9 +73,18 @@ export function App() {
     document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
   )
   const [toast, setToast] = useState<Toast | null>(null)
+  // Live preview from the welcome form, so the constellation shows *their* life.
+  const [lifePreview, setLifePreview] = useState<LifePreview | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
 
   useMidnightRefresh(() => setToday(new Date()))
+
+  const reduced = settings.reduceMotion || prefersReduced
+  // The manual toggle in Settings must calm CSS motion too, not just canvas.
+  useEffect(() => {
+    if (settings.reduceMotion) document.documentElement.dataset.motion = 'reduced'
+    else delete document.documentElement.dataset.motion
+  }, [settings.reduceMotion])
 
   // Wait for persisted data before rendering so note editors initialise correctly.
   useEffect(() => {
@@ -322,6 +333,9 @@ export function App() {
         setPeopleOpen(false)
         setJournalOpen(false)
         setSearchOpen(false)
+        setTimelineOpen(false)
+        setHabitsOpen(false)
+        setAnnualReviewOpen(false)
         return
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
@@ -338,7 +352,11 @@ export function App() {
         insightsOpen ||
         reviewOpen ||
         peopleOpen ||
-        journalOpen
+        journalOpen ||
+        timelineOpen ||
+        habitsOpen ||
+        annualReviewOpen ||
+        searchOpen
       if (
         !typing &&
         !overlayOpen &&
@@ -367,6 +385,7 @@ export function App() {
     today,
     stats,
     editingWeek,
+    editingDay,
     settingsOpen,
     chaptersOpen,
     goalsOpen,
@@ -374,38 +393,116 @@ export function App() {
     reviewOpen,
     peopleOpen,
     journalOpen,
+    timelineOpen,
+    habitsOpen,
+    annualReviewOpen,
+    searchOpen,
     settings.zoom,
     setZoom,
   ])
 
+  // Cursor spotlight: the card under the pointer gets --mx/--my so its
+  // ::before glow can follow the cursor (pure CSS does the rest).
+  useEffect(() => {
+    let last: HTMLElement | null = null
+    const onMove = (e: PointerEvent) => {
+      const el = (e.target as Element | null)?.closest?.('.spot') as HTMLElement | null
+      if (last && last !== el) {
+        last.style.removeProperty('--mx')
+        last.style.removeProperty('--my')
+      }
+      last = el
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      el.style.setProperty('--mx', `${e.clientX - r.left}px`)
+      el.style.setProperty('--my', `${e.clientY - r.top}px`)
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [])
+
   if (!hydrated) return <div className="boot" aria-hidden="true" />
+
+  const backdrop = (
+    <GpuBackdrop
+      totalWeeks={stats?.baseWeeks ?? lifePreview?.totalWeeks ?? DEFAULT_LIFE_YEARS * 52}
+      weeksLived={
+        stats?.weeksLived ?? lifePreview?.weeksLived ?? Math.round(DEFAULT_LIFE_YEARS * 52 * 0.35)
+      }
+      reduceMotion={reduced}
+      themeKey={resolvedTheme}
+    />
+  )
 
   if (locked) {
     return (
-      <AppLock
-        verify={(pass) => (vault ? verifyLockRecord(vault, pass) : Promise.resolve(false))}
-        onUnlock={() => setLocked(false)}
-      />
+      <>
+        {backdrop}
+        <AppLock
+          verify={(pass) => (vault ? verifyLockRecord(vault, pass) : Promise.resolve(false))}
+          onUnlock={() => setLocked(false)}
+        />
+      </>
     )
   }
 
   if (!profile || !stats || !dob) {
     return (
       <>
-        <Onboarding />
+        {backdrop}
+        <Onboarding onPreview={setLifePreview} />
         <ToastView toast={toast} onDismiss={() => setToast(null)} />
       </>
     )
   }
 
-  const reduced = settings.reduceMotion || prefersReduced
+  const navItems = [
+    { key: 'timeline', label: 'Timeline', icon: 'timeline', open: () => setTimelineOpen(true), aria: 'Open life timeline' },
+    { key: 'habits', label: 'Habits', icon: 'habits', open: () => setHabitsOpen(true), aria: 'Open habits and rituals' },
+    { key: 'annual', label: 'Annual review', icon: 'calendar', open: () => setAnnualReviewOpen(true), aria: 'Open annual life review' },
+  ] as const
 
   return (
     <div className="mm-page">
+      {backdrop}
       <div className="mm-shell">
         <header className="mm-topbar">
-          <p className="mm-eyebrow">Your life in weeks</p>
+          <div className="mm-brand">
+            <span className="mm-brand__mark" aria-hidden="true" />
+            <div className="mm-brand__text">
+              <span className="mm-brand__name">Memento Mori</span>
+              <p className="mm-eyebrow">Your life in weeks</p>
+            </div>
+          </div>
+
+          <nav className="mm-nav" aria-label="Sections">
+            {navItems.map((n) => (
+              <button
+                key={n.key}
+                type="button"
+                className="mm-nav__btn"
+                onClick={n.open}
+                aria-label={n.aria}
+                title={n.label}
+              >
+                <Icon name={n.icon} size={15} />
+                <span>{n.label}</span>
+              </button>
+            ))}
+          </nav>
+
           <div className="mm-topbar__cluster">
+            <button
+              type="button"
+              className="mm-search-btn"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search notes and jump to a week"
+              title="Search (Ctrl+K)"
+            >
+              <Icon name="search" size={15} />
+              <span>Search your life…</span>
+              <kbd>Ctrl K</kbd>
+            </button>
             <button
               type="button"
               className="mm-theme-toggle"
@@ -413,52 +510,29 @@ export function App() {
               aria-label="Toggle light and dark theme"
               title="Toggle theme"
             >
-              <svg className="mm-theme-toggle__sun" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="4.2" />
-                <path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M5.2 18.8l1.7-1.7M17.1 6.9l1.7-1.7" />
-              </svg>
-              <svg className="mm-theme-toggle__moon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M20.6 13.4A8.5 8.5 0 1 1 10.6 3.4a7 7 0 0 0 10 10z" />
-              </svg>
+              <Icon name="sun" size={17} className="mm-theme-toggle__sun" />
+              <Icon name="moon" size={17} className="mm-theme-toggle__moon" />
             </button>
             <button
               type="button"
               className="mm-settings-pill"
               onClick={() => setSettingsOpen(true)}
               aria-label="Open settings"
+              title="Settings"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="3.2" />
-                <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.09 1.64V21a2 2 0 1 1-4 0v-.09a1.8 1.8 0 0 0-1.16-1.64 1.8 1.8 0 0 0-1.98.36l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.64-1.09H3a2 2 0 1 1 0-4h.09a1.8 1.8 0 0 0 1.64-1.16 1.8 1.8 0 0 0-.36-1.98l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.8 1.8 0 0 0 1.98.36h.09a1.8 1.8 0 0 0 1.09-1.64V3a2 2 0 1 1 4 0v.09a1.8 1.8 0 0 0 1.09 1.64 1.8 1.8 0 0 0 1.98-.36l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.8 1.8 0 0 0-.36 1.98v.09a1.8 1.8 0 0 0 1.64 1.09H21a2 2 0 1 1 0 4h-.09a1.8 1.8 0 0 0-1.51 1.67z" />
-              </svg>
-              Settings
-            </button>
-            <button
-              type="button"
-              className="mm-settings-pill"
-              onClick={() => setTimelineOpen(true)}
-              aria-label="Open life timeline"
-            >
-              📜 Timeline
-            </button>
-            <button
-              type="button"
-              className="mm-settings-pill"
-              onClick={() => setHabitsOpen(true)}
-              aria-label="Open habits & rituals"
-            >
-              ♻ Habits
-            </button>
-            <button
-              type="button"
-              className="mm-settings-pill"
-              onClick={() => setAnnualReviewOpen(true)}
-              aria-label="Open annual life review"
-            >
-              📅 Annual Review
+              <Icon name="settings" size={17} />
             </button>
           </div>
         </header>
+
+        <nav className="mm-mobile-nav" aria-label="Sections">
+          {navItems.map((n) => (
+            <button key={n.key} type="button" className="mm-pill" onClick={n.open} aria-label={n.aria}>
+              <Icon name={n.icon} size={15} />
+              {n.label}
+            </button>
+          ))}
+        </nav>
 
         <Dashboard
           stats={stats}
@@ -642,7 +716,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast | null; onDismiss: () =>
         </button>
       ) : (
         <button type="button" className="toast__close" aria-label="Dismiss" onClick={onDismiss}>
-          ×
+          <Icon name="close" size={14} />
         </button>
       )}
     </div>

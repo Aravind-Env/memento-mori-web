@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import type { SearchResult, JumpItem } from '../../domain/search'
 import './search.css'
@@ -158,7 +159,7 @@ export function CommandPalette({
               <span className="palette__label">{row.label}</span>
               <span className="palette__meta">
                 {row.chip ? <span className="palette__chip">{row.chip}</span> : null}
-                <code>{row.meta}</code>
+                {row.meta === '→' ? <Icon name="arrowRight" size={14} /> : <code>{row.meta}</code>}
               </span>
             </div>
           ))}
@@ -170,9 +171,9 @@ export function CommandPalette({
           )}
         </div>
         <footer className="palette__foot" aria-hidden="true">
-          <span>↑↓ move</span>
-          <span>↵ open</span>
-          <span>esc close</span>
+          <span><kbd><Icon name="arrowUpDown" size={11} /></kbd> move</span>
+          <span><kbd><Icon name="enter" size={11} /></kbd> open</span>
+          <span><kbd>esc</kbd> close</span>
           <span>#tag · mood:1-5</span>
         </footer>
       </div>

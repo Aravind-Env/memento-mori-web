@@ -92,7 +92,7 @@
   font-weight: 500;
 }
 
-.field__textarea {
+.drawer--people .field__textarea {
   width: 100%;
   min-height: 60px;
   padding: 6px 10px;
@@ -106,7 +106,7 @@
   box-sizing: border-box;
 }
 
-.field__hint {
+.drawer--people .field__hint {
   font-size: 0.72rem;
   color: var(--text-2, #5a6472);
   display: block;

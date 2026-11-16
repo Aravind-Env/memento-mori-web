@@ -79,6 +79,15 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
+/** The accent colour at a given alpha, for the canvas glow streak. */
+function glowRgba(alpha: number): string {
+  const hex = cssVar('--accent').replace('#', '')
+  const full = hex.length === 3 ? hex.replace(/./g, (c) => c + c) : hex
+  const n = parseInt(full, 16)
+  if (!Number.isFinite(n) || full.length !== 6) return `rgba(171,159,242,${alpha})`
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
+}
+
 /** Rounded-rect fallback for engines without Path2D.roundRect. */
 function bandRect(
   ctx: CanvasRenderingContext2D,
@@ -234,7 +243,7 @@ export function WeekCanvas({
     // Axis labels. Zoomed-out views show light quarter marks and age rows;
     // the year view labels each week's month instead.
     ctx.fillStyle = muted
-    ctx.font = '12px Figtree, system-ui, sans-serif'
+    ctx.font = '500 11px Geist, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'alphabetic'
     if (yearView && dob) {
@@ -274,11 +283,11 @@ export function WeekCanvas({
       const cy = py(currentRel)
       const g = ctx.createLinearGradient(PAD_L, 0, PAD_L + cols * cs, 0)
       const p = (cx - PAD_L) / (cols * cs)
-      g.addColorStop(0, 'rgba(238,108,77,0)')
-      g.addColorStop(Math.max(0, p - 0.25), 'rgba(238,108,77,.10)')
-      g.addColorStop(p, 'rgba(238,108,77,.35)')
-      g.addColorStop(Math.min(1, p + 0.35), 'rgba(238,108,77,.06)')
-      g.addColorStop(1, 'rgba(238,108,77,0)')
+      g.addColorStop(0, glowRgba(0))
+      g.addColorStop(Math.max(0, p - 0.25), glowRgba(0.10))
+      g.addColorStop(p, glowRgba(0.35))
+      g.addColorStop(Math.min(1, p + 0.35), glowRgba(0.06))
+      g.addColorStop(1, glowRgba(0))
       ctx.fillStyle = g
       ctx.fillRect(PAD_L, cy - rs * 1.3, cols * cs, rs * 2.6)
     }
@@ -594,7 +603,7 @@ function drawLife(
   const years = Math.max(Math.ceil(total / p.cols), 1)
   const lifeYears = p.lifeYears ?? Math.floor(p.baseWeeks / p.cols)
   const caption = captionText(lifeYears, lifeYears * p.cols)
-  ctx.font = '12px Figtree, system-ui, sans-serif'
+  ctx.font = '500 11px Geist, system-ui, sans-serif'
   let geometry: GridGeometry
   try {
     geometry = computeGridGeometry({
@@ -675,11 +684,11 @@ function drawLife(
   if (focusCenter && currentBlock) {
     const g = ctx.createLinearGradient(currentBlock.x, 0, currentBlock.x + geometry.blockW, 0)
     const pos = (focusCenter.x - currentBlock.x) / geometry.blockW
-    g.addColorStop(0, 'rgba(238,108,77,0)')
-    g.addColorStop(Math.max(0, pos - 0.25), 'rgba(238,108,77,.10)')
-    g.addColorStop(pos, 'rgba(238,108,77,.35)')
-    g.addColorStop(Math.min(1, pos + 0.35), 'rgba(238,108,77,.06)')
-    g.addColorStop(1, 'rgba(238,108,77,0)')
+    g.addColorStop(0, glowRgba(0))
+    g.addColorStop(Math.max(0, pos - 0.25), glowRgba(0.10))
+    g.addColorStop(pos, glowRgba(0.35))
+    g.addColorStop(Math.min(1, pos + 0.35), glowRgba(0.06))
+    g.addColorStop(1, glowRgba(0))
     ctx.save()
     ctx.beginPath()
     ctx.rect(currentBlock.x, currentBlock.y, geometry.blockW, geometry.blockH)

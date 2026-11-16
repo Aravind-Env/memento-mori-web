@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import { useJournal } from '../../core/useJournal'
 import { dateKey, formatDayLong } from '../../domain/daily'
@@ -206,7 +207,7 @@ export function JournalPanel({
             <h2 className="drawer__title">Everything you've written</h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close journal">
-            ×
+            <Icon name="close" size={16} />
           </button>
         </header>
 

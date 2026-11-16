@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { Icon } from '../../shared/Icon'
+import { Select } from '../../shared/Select'
 
 import { MiniGrid } from '../grid/MiniGrid'
 import { parseISODate, toISODate } from '../../domain/dates'
@@ -246,7 +248,7 @@ export function Settings({ onClose, onToast }: SettingsProps) {
         <header className="drawer__head">
           <h2 className="drawer__title">Settings</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close settings">
-            ×
+            <Icon name="close" size={16} />
           </button>
         </header>
 
@@ -281,6 +283,7 @@ export function Settings({ onClose, onToast }: SettingsProps) {
               min={MIN_LIFE_YEARS}
               max={MAX_LIFE_YEARS}
               value={profile.lifeYears}
+              style={{ '--fill': `${((profile.lifeYears - MIN_LIFE_YEARS) / (MAX_LIFE_YEARS - MIN_LIFE_YEARS)) * 100}%` } as CSSProperties}
               onChange={(e) => updateProfile({ lifeYears: Number(e.target.value) })}
             />
           </label>
@@ -385,23 +388,24 @@ export function Settings({ onClose, onToast }: SettingsProps) {
           </div>
 
           {warningLevel !== 'normal' && (
-            <div style={{ padding: '8px 12px', background: warningLevel === 'critical' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
-              ⚠ Storage warning ({warningLevel}): Approaching capacity. Please export a backup.
+            <div className={`status-banner${warningLevel === 'critical' ? ' status-banner--critical' : ''}`} role="status">
+              <Icon name="warning" size={16} /> Storage warning ({warningLevel}): approaching capacity. Please export a backup.
             </div>
           )}
 
           <label className="field">
             <span className="field__label">Backup Reminders</span>
-            <select
-              className="field__input"
+            <Select<BackupFrequency>
+              ariaLabel="Backup reminders"
               value={settings.backupFrequency ?? 'weekly'}
-              onChange={(e) => setBackupFrequency(e.target.value as BackupFrequency)}
-            >
-              <option value="off">Off</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-            </select>
+              onChange={setBackupFrequency}
+              options={[
+                { value: 'off', label: 'Off' },
+                { value: 'weekly', label: 'Weekly' },
+                { value: 'monthly', label: 'Monthly' },
+                { value: 'quarterly', label: 'Quarterly' },
+              ]}
+            />
           </label>
 
           <div className="settings__actions" style={{ marginTop: '12px' }}>
@@ -412,9 +416,9 @@ export function Settings({ onClose, onToast }: SettingsProps) {
           {integrityResult && (
             <div className="settings__note" style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-subtle, rgba(0,0,0,0.03))', borderRadius: '6px' }}>
               {integrityResult.ok ? (
-                <span style={{ color: 'var(--success, #10b981)' }}>✓ Integrity check passed ({integrityResult.entryCount} entries, {integrityResult.versionCount} versions)</span>
+                <span className="status-line status-line--ok"><Icon name="shield" size={15} /> Integrity check passed ({integrityResult.entryCount} entries, {integrityResult.versionCount} versions)</span>
               ) : (
-                <span style={{ color: 'var(--danger, #ef4444)' }}>⚠ Integrity issues found: {integrityResult.errors.join(', ')}</span>
+                <span className="status-line status-line--bad"><Icon name="warning" size={15} /> Integrity issues found: {integrityResult.errors.join(', ')}</span>
               )}
             </div>
           )}

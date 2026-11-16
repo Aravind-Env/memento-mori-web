@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Icon } from '../../shared/Icon'
 
 import type { Chapter } from '../../data/model'
 import './chapters.css'
@@ -146,7 +147,7 @@ export function ChaptersPanel({
             <h2 className="drawer__title">Seasons of your life</h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close chapters">
-            ×
+            <Icon name="close" size={16} />
           </button>
         </header>
 
@@ -182,7 +183,7 @@ export function ChaptersPanel({
                   onClick={() => handleDelete(c)}
                   aria-label={`Delete chapter ${c.name}`}
                 >
-                  ×
+                  <Icon name="trash" size={14} />
                 </button>
               </li>
             ))}
